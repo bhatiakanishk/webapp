@@ -217,7 +217,7 @@ app.get("/v1/account/:accountid", async (req,res) =>
         
                                 else{
                                     console.log("------> Account ID Mismatch")
-                                    res.sendStatus(403).end()
+                                    res.sendStatus(403).end
                                 }
                             }
                             else{
