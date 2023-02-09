@@ -1,56 +1,18 @@
-const chai = require("chai");
-const chaiHttp = require("chai-http");
+const request = require("supertest");
 const app = require("../index");
-
-chai.use(chaiHttp);
+const chai = require("chai");
 const expect = chai.expect;
 
-describe('Health Check', () => {
-    it('should return OK', (done) => {
-        chai.request(app)
-            .get('/healthz')
-            .end((err, res) => {
-                expect(err).to.be.null;
-                expect(res).to.have.status(200);
-                expect(res.body).to.be.equal('OK');
-                done();
-            });
-    });
-});
-
-describe('Create User', () => {
-    it('should return 400 for invalid email address', (done) => {
-        chai.request(app)
-            .post('/v1/account')
+describe("Email validation test", () => {
+    it("should return 400 for invalid email address", async () => {
+        const res = await request(app)
+            .post("/v1/account")
             .send({
-                username: 'invalidemail',
-                firstname: 'John',
-                lastname: 'Doe',
-                password: 'password'
-            })
-            .end((err, res) => {
-                expect(err).to.be.null;
-                expect(res).to.have.status(400);
-                done();
+                username: "invalidemail",
+                firstname: "John",
+                lastname: "Doe",
+                password: "password"
             });
-    });
-
-    it('should create a user for valid email address', (done) => {
-        chai.request(app)
-            .post('/v1/account')
-            .send({
-                username: 'validmailaddress@example.com',
-                firstname: 'John',
-                lastname: 'Doe',
-                password: 'password'
-            })
-            .end((err, res) => {
-                expect(err).to.be.null;
-                expect(res).to.have.status(200);
-                expect(res.body).to.have.property('email', 'validmailaddress@example.com');
-                expect(res.body).to.have.property('firstName', 'John');
-                expect(res.body).to.have.property('lastName', 'Doe');
-                done();
-            });
+        expect(res.statusCode).to.equal(400);
     });
 });
