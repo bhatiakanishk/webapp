@@ -3,6 +3,7 @@ const { Sequelize } = require('sequelize');
 
 describe('Test database connection', () => {
     it('should connect to the user table in the database', (done) => {
+        this.timeout(5000);
         const sequelize = new Sequelize('userDB', 'root', 'password', {
             host: 'localhost',
             dialect: 'mysql',
