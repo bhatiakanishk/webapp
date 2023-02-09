@@ -4,9 +4,7 @@ const crypto = require("crypto");
 module.exports = app;
 
 // Sequelize ORM
-const {
-    Sequelize
-} = require('sequelize');
+const { Sequelize } = require('sequelize');
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -14,7 +12,6 @@ function generateRandomInt(min, max) {
     const adjustedInt = (randomInt % (max - min + 1)) + min;
     return adjustedInt;
 }
-module.exports = generateRandomInt;
 
 // Parameters to create user table
 const sequelize = new Sequelize('userDB', 'root', 'password', {
