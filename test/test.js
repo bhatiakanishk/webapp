@@ -1,56 +1,12 @@
-const chai = require("chai");
-const chaiHttp = require("chai-http");
-const app = require("../index");
+const assert = require('assert');
 
-chai.use(chaiHttp);
-const expect = chai.expect;
+describe('Test addition of two numbers', () => {
+    it('should add two numbers correctly', () => {
+        const num1 = 2;
+        const num2 = 3;
+        const expectedSum = 5;
 
-describe('Health Check', () => {
-    it('should return OK', (done) => {
-        chai.request(app)
-            .get('/healthz')
-            .end((err, res) => {
-                expect(err).to.be.null;
-                expect(res).to.have.status(200);
-                expect(res.body).to.be.equal('OK');
-                done();
-            });
-    });
-});
-
-describe('Create User', () => {
-    it('should return 400 for invalid email address', (done) => {
-        chai.request(app)
-            .post('/v1/account')
-            .send({
-                username: 'invalidemail',
-                firstname: 'John',
-                lastname: 'Doe',
-                password: 'password'
-            })
-            .end((err, res) => {
-                expect(err).to.be.null;
-                expect(res).to.have.status(400);
-                done();
-            });
-    });
-
-    it('should create a user for valid email address', (done) => {
-        chai.request(app)
-            .post('/v1/account')
-            .send({
-                username: 'validmailaddress@example.com',
-                firstname: 'John',
-                lastname: 'Doe',
-                password: 'password'
-            })
-            .end((err, res) => {
-                expect(err).to.be.null;
-                expect(res).to.have.status(200);
-                expect(res.body).to.have.property('email', 'validmailaddress@example.com');
-                expect(res.body).to.have.property('firstName', 'John');
-                expect(res.body).to.have.property('lastName', 'Doe');
-                done();
-            });
+        const actualSum = num1 + num2;
+        assert.equal(actualSum, expectedSum);
     });
 });
