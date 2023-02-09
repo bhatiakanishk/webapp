@@ -1,5 +1,3 @@
-'use strict'
-
 const chai = require("chai");
 const chaiHttp = require("chai-http");
 const app = require("../index");
@@ -41,7 +39,7 @@ describe('Create User', () => {
         chai.request(app)
             .post('/v1/account')
             .send({
-                username: 'validemail@example.com',
+                username: 'validmailaddress@example.com',
                 firstname: 'John',
                 lastname: 'Doe',
                 password: 'password'
@@ -49,7 +47,7 @@ describe('Create User', () => {
             .end((err, res) => {
                 expect(err).to.be.null;
                 expect(res).to.have.status(200);
-                expect(res.body).to.have.property('email', 'validemail@example.com');
+                expect(res.body).to.have.property('email', 'validmailaddress@example.com');
                 expect(res.body).to.have.property('firstName', 'John');
                 expect(res.body).to.have.property('lastName', 'Doe');
                 done();
