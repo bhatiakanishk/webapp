@@ -112,7 +112,8 @@ app.post("/v1/account", async (req, res) => {
                                 lastName: lastname,
                                 password: hashedPassword,
                             })
-                            .then(user => res.json({
+                            .then(user => res.status(201).send({
+                                message: 'User Created',
                                 accountid: user.accountid,
                                 email: user.email,
                                 firstName: user.firstName,
@@ -392,7 +393,7 @@ app.post("/v1/product", async (req, res) => {
 
         if (!user) {
             console.log("------> User not found");
-            return res.status(400).send({
+            return res.status(404).send({
                 error: "User not found"
             });
         }
@@ -447,8 +448,10 @@ app.post("/v1/product", async (req, res) => {
             quantity: productQuantity,
             accountid: ownerId,
         });
-
-        return res.json(product);
+        return res.status(201).send({
+            message: "Product Created",
+            product: product
+        });        
     } catch (error) {
         console.error(error);
         return res.status(400).send({
@@ -488,7 +491,7 @@ app.delete("/v1/product/:productid", async(req, res) => {
 
         if (!user) {
             console.log("------> User not found");
-            return res.status(400).send({
+            return res.status(404).send({
                 error: "User not found"
             });
         }
@@ -496,23 +499,29 @@ app.delete("/v1/product/:productid", async(req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             console.log("------> Incorrect Password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Incorrect Password"
             });
         }
-
         const productId = req.params.productid;
         const product = await Products.findByPk(productId);
 
         if(!product) {
             console.log("------> Product not found");
-            return res.status(400).send({
+            return res.status(404).send({
                 error: "Product not found"
             });
         }
 
+        const userId = user.accountid;
+        const ownerId = product.ownerId;
+        if(userId != ownerId) {
+            console.log("------> Not authorized to delete this product");
+        return res.status(403).send({
+            error: "Not authorized to delete this product"
+        });
+    }
         await product.destroy();
-
         return res.status(200).send({
             message: "Product deleted successfully"
         });
@@ -555,7 +564,7 @@ app.put("/v1/product/:productid", async(req, res) => {
 
         if (!user) {
             console.log("------> User not found");
-            return res.status(400).send({
+            return res.status(404).send({
                 error: "User not found"
             });
         }
@@ -563,7 +572,7 @@ app.put("/v1/product/:productid", async(req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             console.log("------> Incorrect Password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Incorrect Password"
             });
         }
@@ -580,6 +589,13 @@ app.put("/v1/product/:productid", async(req, res) => {
         const productQuantity = req.body.productquantity;
         const ownerId = userId;
 
+        if (!productName || !productDescription || !productSku || !productManufacturer || productName.length === 0 || productDescription.length === 0 || productSku.length === 0 || productManufacturer.length === 0) {
+            console.log("------> Missing required field");
+            return res.status(400).send({
+                error: "Missing required field"
+            });
+        }
+
         if (!Number.isInteger(productQuantity) || productQuantity < 0) {
             console.log("------> Product quantity invalid");
             return res.status(400).send({
@@ -595,9 +611,9 @@ app.put("/v1/product/:productid", async(req, res) => {
         });
 
         if (!product) {
-            console.log("------> Product not found");
-            return res.status(400).send({
-                error: "Product not found"
+            console.log("------> Unauthorized to update this product");
+            return res.status(403).send({
+                error: "Unauthorized to update this product"
             });
         }
 
@@ -663,7 +679,7 @@ app.patch("/v1/product/:productid", async(req, res) => {
 
         if (!user) {
             console.log("------> User not found");
-            return res.status(400).send({
+            return res.status(404).send({
                 error: "User not found"
             });
         }
@@ -705,9 +721,9 @@ app.patch("/v1/product/:productid", async(req, res) => {
         });
 
         if (!product) {
-            console.log("------> Product not found");
-            return res.status(400).send({
-                error: "Product not found"
+            console.log("------> Unauthorized to update this product");
+            return res.status(403).send({
+                error: "Unauthorized to update this product"
             });
         }
 
