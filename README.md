@@ -37,4 +37,7 @@ Sample to add new product:
 
 
 ## To run the code
-node index.js
+npm start
+
+## To run the test
+npm run test
