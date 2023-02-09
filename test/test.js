@@ -1,18 +1,22 @@
-const request = require("supertest");
-const app = require("../index");
-const chai = require("chai");
-const expect = chai.expect;
+const assert = require('assert');
+const { Sequelize } = require('sequelize');
 
-describe("Email validation test", () => {
-    it("should return 400 for invalid email address", async () => {
-        const res = await request(app)
-            .post("/v1/account")
-            .send({
-                username: "invalidemail",
-                firstname: "John",
-                lastname: "Doe",
-                password: "password"
+describe('Test database connection', () => {
+    it('should connect to the user table in the database', (done) => {
+        const sequelize = new Sequelize('userDB', 'root', 'password', {
+            host: 'localhost',
+            dialect: 'mysql',
+            port: '3306'
+        });
+
+        sequelize.authenticate()
+            .then(() => {
+                assert.ok(true);
+                done();
+            })
+            .catch((error) => {
+                assert.fail(error);
+                done();
             });
-        expect(res.statusCode).to.equal(400);
     });
 });

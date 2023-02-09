@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "assert": "^2.0.0",
     "bcrypt": "^5.1.0",
     "chai": "^4.3.7",
     "crypto": "^1.0.1",
@@ -15,5 +16,8 @@
   "scripts": {
     "start": "npm install && node index.js",
     "test": "mocha"
+  },
+  "devDependencies": {
+    "jest": "^29.4.2"
   }
 }
