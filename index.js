@@ -80,7 +80,7 @@ const bcrypt = require("bcrypt")
 app.use(express.json())
 
 //Create User
-app.post("/v1/account", async (req, res) => {
+app.post("/v1/user", async (req, res) => {
     const accountId = generateRandomInt(1, 1000);;
     const emailaddress = req.body.username;
     const firstname = req.body.firstname;
@@ -175,7 +175,7 @@ app.get("/login", async (req, res) => {
 });
 
 // Get User Info
-app.get("/v1/account/:accountid", async (req, res) => {
+app.get("/v1/user/:accountid", async (req, res) => {
     const input_id = req.params.accountid;
 
     if (req.headers.authorization == null) {
@@ -231,7 +231,7 @@ app.get("/v1/account/:accountid", async (req, res) => {
 });
 
 // Update User Info
-app.put("/v1/account/:accountid", async (req, res) => {
+app.put("/v1/user/:accountid", async (req, res) => {
     const input_id = req.params.accountid;
     const new_hash = await bcrypt.hash(req.body.password, 10);
     const new_first_name = req.body.firstname;
@@ -368,7 +368,7 @@ app.post("/v1/product", async (req, res) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }
@@ -401,7 +401,7 @@ app.post("/v1/product", async (req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             console.log("------> Incorrect Password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Incorrect Password"
             });
         }
@@ -418,7 +418,7 @@ app.post("/v1/product", async (req, res) => {
         const productQuantity = req.body.productquantity;
         const ownerId = userId;
 
-        if (!Number.isInteger(productQuantity) || productQuantity < 0) {
+        if (!Number.isInteger(productQuantity) || productQuantity <= 0 || productQuantity >= 100) {
             console.log("------> Product quantity invalid");
             return res.status(400).send({
                 error: "Invalid product quantity"
@@ -466,7 +466,7 @@ app.delete("/v1/product/:productid", async(req, res) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }
@@ -514,7 +514,8 @@ app.delete("/v1/product/:productid", async(req, res) => {
         }
 
         const userId = user.accountid;
-        const ownerId = product.ownerId;
+        const ownerId = product.accountid;
+        //console.log(ownerId)
         if(userId != ownerId) {
             console.log("------> Not authorized to delete this product");
         return res.status(403).send({
@@ -539,7 +540,7 @@ app.put("/v1/product/:productid", async(req, res) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }
@@ -626,7 +627,7 @@ app.put("/v1/product/:productid", async(req, res) => {
 
         if (existingProduct && existingProduct.productid !== productId) {
             console.log("------> Product SKU already exists");
-            return res.status(400).send({
+            return res.status(403).send({
                 error: "Product SKU already exists"
             });
         }
@@ -654,7 +655,7 @@ app.patch("/v1/product/:productid", async(req, res) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }
@@ -687,7 +688,7 @@ app.patch("/v1/product/:productid", async(req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             console.log("------> Incorrect Password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Incorrect Password"
             });
         }
@@ -722,7 +723,7 @@ app.patch("/v1/product/:productid", async(req, res) => {
 
         if (!product) {
             console.log("------> Unauthorized to update this product");
-            return res.status(403).send({
+            return res.status(401).send({
                 error: "Unauthorized to update this product"
             });
         }
@@ -737,7 +738,7 @@ app.patch("/v1/product/:productid", async(req, res) => {
 
             if (existingProduct && existingProduct.productid !== productId) {
                 console.log("------> Product SKU already exists");
-                return res.status(400).send({
+                return res.status(403).send({
                     error: "Product SKU already exists"
                 });
             }
@@ -772,11 +773,11 @@ app.get("/v1/product/:productId", async (req, res) => {
 
         if (!product) {
             console.log("------> Product not found");
-            return res.status(400).send({
+            return res.status(404).send({
                 error: "Product not found"
             });
         }
-        return res.json(product);
+        return res.status(200).json(product);
     } catch (error) {
         console.error(error);
         return res.status(400).send({
