@@ -4,7 +4,9 @@ const crypto = require("crypto");
 module.exports = app;
 
 // Sequelize ORM
-const { Sequelize } = require('sequelize');
+const {
+    Sequelize
+} = require('sequelize');
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -34,20 +36,20 @@ app.get('/healthz', (req, res) => {
 
 // Create table "Users" with columns  
 const Users = sequelize.define('Users', {
-    accountid: {
+    id: {
         type: Sequelize.INTEGER,
         allowNull: false,
     },
-    email: {
+    username: {
         type: Sequelize.STRING,
         allowNull: false,
         primaryKey: true
     },
-    firstName: {
+    first_name: {
         type: Sequelize.STRING,
         allowNull: false,
     },
-    lastName: {
+    last_name: {
         type: Sequelize.STRING,
         allowNull: false,
     },
@@ -59,9 +61,9 @@ const Users = sequelize.define('Users', {
         type: Sequelize.DATE,
         defaultValue: Sequelize.NOW
     },
-    // Timestamp
-    createdAt: Sequelize.DATE,
-    updatedAt: Sequelize.DATE,
+}, {
+    createdAt: 'account_created',
+    updatedAt: 'account_updated'
 })
 
 // Check for user table creation
@@ -81,44 +83,46 @@ app.use(express.json())
 
 //Create User
 app.post("/v1/user", async (req, res) => {
-    const accountId = generateRandomInt(1, 1000);;
-    const emailaddress = req.body.username;
-    const firstname = req.body.firstname;
-    const lastname = req.body.lastname;
+    const id = generateRandomInt(1, 1000);;
+    const username = req.body.username;
+    const first_name = req.body.first_name;
+    const last_name = req.body.last_name;
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
     // Email Validation
     let regex = new RegExp('[a-z0-9]+@[a-z]+\.[a-z]{2,3}');
-    let checkemail = [emailaddress];
+    let checkemail = [username];
     checkemail.forEach((address) => {
-        console.log(regex.test(address))
-        console.log(emailaddress)
+        // console.log(regex.test(address))
+        // console.log(emailaddress)
         if (regex.test(address) == false) {
             console.log("------> Please enter a valid email address")
             res.sendStatus(400)
         } else {
             Users.findOne({
-                    attributes: ['email'],
+                    attributes: ['username'],
                     where: {
-                        email: emailaddress
+                        username: username
                     },
                 })
                 .then(find_user => {
                     if (find_user == null) {
                         Users.create({
-                                accountid: accountId,
-                                email: emailaddress,
-                                firstName: firstname,
-                                lastName: lastname,
+                                id: id,
+                                username: username,
+                                first_name: first_name,
+                                last_name: last_name,
                                 password: hashedPassword,
                             })
                             .then(user => res.status(201).send({
                                 message: 'User Created',
-                                accountid: user.accountid,
-                                email: user.email,
-                                firstName: user.firstName,
-                                lastName: user.lastName
-                            }))                              
+                                id: user.id,
+                                username: user.username,
+                                first_name: user.first_name,
+                                last_name: user.last_name,
+                                account_created: user.account_created,
+                                account_updated: user.account_updated
+                            }))
                             .catch(err => res.sendStatus(400).json({
                                 error: err.message
                             }))
@@ -153,7 +157,7 @@ app.get("/login", async (req, res) => {
                 Users.findOne({
                         attributes: ['password'],
                         where: {
-                            email: input_emailaddress,
+                            username: input_emailaddress,
                         },
                     })
                     .then(find_user => {
@@ -175,8 +179,8 @@ app.get("/login", async (req, res) => {
 });
 
 // Get User Info
-app.get("/v1/user/:accountid", async (req, res) => {
-    const input_id = req.params.accountid;
+app.get("/v1/user/:userid", async (req, res) => {
+    const input_id = req.params.userid;
 
     if (req.headers.authorization == null) {
         console.log("------> No credentials passed")
@@ -192,25 +196,25 @@ app.get("/v1/user/:accountid", async (req, res) => {
             res.sendStatus(401).end()
         } else {
             Users.findAll({
-                    attributes: ['email', 'accountid', 'firstName', 'lastName', 'createdAt', 'updatedAt'],
+                    attributes: ['username', 'id', 'first_name', 'last_name', 'account_created', 'account_updated'],
                     where: {
-                        accountid: input_id,
+                        id: input_id,
                     },
                 })
                 .then(find_user => {
                     if (find_user != "") {
                         console.log(find_user)
                         Users.findOne({
-                                attributes: ['email', 'password'],
+                                attributes: ['username', 'password'],
                                 where: {
-                                    accountid: input_id,
+                                    id: input_id,
                                 },
                             })
                             .then(find_password => {
                                 bcrypt.compare(input_password, find_password.password, function (err, compare_results) {
                                     if (compare_results) {
                                         console.log("------> User Logged in")
-                                        if (find_password.email == input_emailaddress) {
+                                        if (find_password.username == input_emailaddress) {
                                             res.json([find_user]).end()
                                         } else {
                                             console.log("------> Account ID Mismatch")
@@ -231,11 +235,11 @@ app.get("/v1/user/:accountid", async (req, res) => {
 });
 
 // Update User Info
-app.put("/v1/user/:accountid", async (req, res) => {
-    const input_id = req.params.accountid;
+app.put("/v1/user/:userid", async (req, res) => {
+    const input_id = req.params.userid;
     const new_hash = await bcrypt.hash(req.body.password, 10);
-    const new_first_name = req.body.firstname;
-    const new_last_name = req.body.lastname;
+    const new_first_name = req.body.first_name;
+    const new_last_name = req.body.last_name;
 
     if (req.headers.authorization == null) {
         console.log("------> No credentials passed")
@@ -251,31 +255,31 @@ app.put("/v1/user/:accountid", async (req, res) => {
             res.sendStatus(401).end()
         } else {
             Users.findAll({
-                    attributes: ['email', 'accountid', 'firstName', 'lastName', 'createdAt', 'updatedAt'],
+                    attributes: ['username', 'id', 'first_name', 'last_name', 'account_created', 'account_updated'],
                     where: {
-                        accountid: input_id,
+                        id: input_id,
                     },
                 })
                 .then(find_user => {
                     if (find_user != "") {
                         Users.findOne({
-                                attributes: ['email', 'password'],
+                                attributes: ['username', 'password'],
                                 where: {
-                                    accountid: input_id,
+                                    id: input_id,
                                 },
                             })
                             .then(find_password => {
                                 bcrypt.compare(input_password, find_password.password, function (err, compare_results) {
                                     if (compare_results) {
                                         console.log("------> User Logged in")
-                                        if (find_password.email == input_emailaddress) {
+                                        if (find_password.username == input_emailaddress) {
                                             Users.update({
-                                                    firstName: new_first_name,
-                                                    lastName: new_last_name,
+                                                    first_name: new_first_name,
+                                                    last_name: new_last_name,
                                                     password: new_hash,
                                                 }, {
                                                     where: {
-                                                        accountid: input_id
+                                                        id: input_id
                                                     }
                                                 })
                                                 .then(r3 => {
@@ -317,12 +321,12 @@ sequelizeProduct.authenticate().then(() => {
 
 // Create table "Products" with columns  
 const Products = sequelizeProduct.define('Products', {
-    productid: {
+    id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         primaryKey: true,
     },
-    productName: {
+    name: {
         type: Sequelize.STRING,
         allowNull: false,
     },
@@ -333,6 +337,7 @@ const Products = sequelizeProduct.define('Products', {
     sku: {
         type: Sequelize.STRING,
         allowNull: false,
+        unique: true,
     },
     manufacturer: {
         type: Sequelize.STRING,
@@ -342,7 +347,7 @@ const Products = sequelizeProduct.define('Products', {
         type: Sequelize.INTEGER,
         allowNull: false,
     },
-    accountid: {
+    owner_user_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
     },
@@ -350,9 +355,9 @@ const Products = sequelizeProduct.define('Products', {
         type: Sequelize.DATE,
         defaultValue: Sequelize.NOW
     },
-    // Timestamp
-    createdAt: Sequelize.DATE,
-    updatedAt: Sequelize.DATE,
+}, {
+    createdAt: 'date_added',
+    updatedAt: 'date_last_updated'
 })
 
 // Check for product table creation
@@ -385,9 +390,9 @@ app.post("/v1/product", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await Users.findOne({
-            attributes: ["accountid", "password"],
+            attributes: ["id", "password"],
             where: {
-                email: inputEmailAddress,
+                username: inputEmailAddress,
             },
         });
 
@@ -405,20 +410,31 @@ app.post("/v1/product", async (req, res) => {
                 error: "Incorrect Password"
             });
         }
-
-        const userId = user.accountid;
-        console.log(userId);
         console.log("------> User Logged in");
-        
-        const productId = generateRandomInt(1, 1000);
-        const productName = req.body.productname;
-        const productDescription = req.body.productdescription;
-        const productSku = req.body.productsku;
-        const productManufacturer = req.body.productmanufacturer;
-        const productQuantity = req.body.productquantity;
-        const ownerId = userId;
 
-        if (!Number.isInteger(productQuantity) || productQuantity <= 0 || productQuantity >= 100) {
+        const id = generateRandomInt(1, 1000);
+        const name = req.body.name;
+        const description = req.body.description;
+        const sku = req.body.sku;
+        const manufacturer = req.body.manufacturer;
+        const quantity = req.body.quantity;
+        const owner_user_id = user.id;
+
+        if (!name || !description || !sku || !manufacturer || !quantity) {
+            console.log("------> Missing required fields");
+            return res.status(400).send({
+                error: "Please enter all the required fields"
+            });
+        }
+
+        if (typeof name !== "string" || typeof description !== "string" || typeof sku !== "string" || typeof manufacturer !== "string" || typeof quantity !== "number" || typeof owner_user_id !== "number") {
+            console.log("------> Invalid input data types");
+            return res.status(400).send({
+                error: "Invalid input data types"
+            });
+        }
+
+        if (!Number.isInteger(quantity) || quantity <= 0 || quantity >= 100) {
             console.log("------> Product quantity invalid");
             return res.status(400).send({
                 error: "Invalid product quantity"
@@ -428,7 +444,7 @@ app.post("/v1/product", async (req, res) => {
         const existingProduct = await Products.findOne({
             attributes: ["sku"],
             where: {
-                sku: productSku,
+                sku: sku,
             },
         });
 
@@ -440,18 +456,18 @@ app.post("/v1/product", async (req, res) => {
         }
 
         const product = await Products.create({
-            productid: productId,
-            productName: productName,
-            description: productDescription,
-            sku: productSku,
-            manufacturer: productManufacturer,
-            quantity: productQuantity,
-            accountid: ownerId,
+            id: id,
+            name: name,
+            description: description,
+            sku: sku,
+            manufacturer: manufacturer,
+            quantity: quantity,
+            owner_user_id: owner_user_id,
         });
         return res.status(201).send({
             message: "Product Created",
             product: product
-        });        
+        });
     } catch (error) {
         console.error(error);
         return res.status(400).send({
@@ -461,7 +477,7 @@ app.post("/v1/product", async (req, res) => {
 });
 
 // Delete product
-app.delete("/v1/product/:productid", async(req, res) => {
+app.delete("/v1/product/:productId", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -483,9 +499,9 @@ app.delete("/v1/product/:productid", async(req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await Users.findOne({
-            attributes: ["accountid", "password"],
+            attributes: ["id", "password"],
             where: {
-                email: inputEmailAddress,
+                username: inputEmailAddress,
             },
         });
 
@@ -503,25 +519,21 @@ app.delete("/v1/product/:productid", async(req, res) => {
                 error: "Incorrect Password"
             });
         }
-        const productId = req.params.productid;
-        const product = await Products.findByPk(productId);
+        const id = req.params.productId;
+        const product = await Products.findByPk(id);
 
-        if(!product) {
+        if (!product) {
             console.log("------> Product not found");
             return res.status(404).send({
                 error: "Product not found"
             });
         }
-
-        const userId = user.accountid;
-        const ownerId = product.accountid;
-        //console.log(ownerId)
-        if(userId != ownerId) {
+        if (user.id != product.owner_user_id) {
             console.log("------> Not authorized to delete this product");
-        return res.status(403).send({
-            error: "Not authorized to delete this product"
-        });
-    }
+            return res.status(403).send({
+                error: "Not authorized to delete this product"
+            });
+        }
         await product.destroy();
         return res.status(200).send({
             message: "Product deleted successfully"
@@ -535,7 +547,7 @@ app.delete("/v1/product/:productid", async(req, res) => {
 });
 
 // Update product with PUT
-app.put("/v1/product/:productid", async(req, res) => {
+app.put("/v1/product/:productId", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -557,9 +569,9 @@ app.put("/v1/product/:productid", async(req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await Users.findOne({
-            attributes: ["accountid", "password"],
+            attributes: ["id", "password"],
             where: {
-                email: inputEmailAddress,
+                username: inputEmailAddress,
             },
         });
 
@@ -577,27 +589,30 @@ app.put("/v1/product/:productid", async(req, res) => {
                 error: "Incorrect Password"
             });
         }
-
-        const userId = user.accountid;
-        console.log(userId);
         console.log("------> User Logged in");
+        const productId = req.params.productId;
+        const name = req.body.name;
+        const description = req.body.description;
+        const sku = req.body.sku;
+        const manufacturer = req.body.manufacturer;
+        const quantity = req.body.quantity;
+        const owner_user_id = user.id;
 
-        const productId = req.params.productid;
-        const productName = req.body.productname;
-        const productDescription = req.body.productdescription;
-        const productSku = req.body.productsku;
-        const productManufacturer = req.body.productmanufacturer;
-        const productQuantity = req.body.productquantity;
-        const ownerId = userId;
-
-        if (!productName || !productDescription || !productSku || !productManufacturer || productName.length === 0 || productDescription.length === 0 || productSku.length === 0 || productManufacturer.length === 0) {
+        if (!name || !description || !sku || !manufacturer || name.length === 0 || description.length === 0 || sku.length === 0 || manufacturer.length === 0) {
             console.log("------> Missing required field");
             return res.status(400).send({
                 error: "Missing required field"
             });
         }
 
-        if (!Number.isInteger(productQuantity) || productQuantity < 0) {
+        if (typeof name !== "string" || typeof description !== "string" || typeof sku !== "string" || typeof manufacturer !== "string" || typeof quantity !== "number" || typeof owner_user_id !== "number") {
+            console.log("------> Invalid input data types");
+            return res.status(400).send({
+                error: "Invalid input data types"
+            });
+        }
+
+        if (!Number.isInteger(quantity) || quantity <= 0 || quantity >= 100) {
             console.log("------> Product quantity invalid");
             return res.status(400).send({
                 error: "Invalid product quantity"
@@ -606,8 +621,8 @@ app.put("/v1/product/:productid", async(req, res) => {
 
         const product = await Products.findOne({
             where: {
-                productid: productId,
-                accountid: ownerId
+                id: productId,
+                owner_user_id: owner_user_id
             }
         });
 
@@ -618,28 +633,30 @@ app.put("/v1/product/:productid", async(req, res) => {
             });
         }
 
-        const existingProduct = await Products.findOne({
-            where: {
-                sku: productSku,
-                accountid: ownerId
+        if (sku && sku !== product.sku) {
+            try {
+                const existingProduct = await Products.findOne({ where: { sku } });
+                if (existingProduct) {
+                    console.log("------> SKU already exists in the database");
+                    return res.status(400).send({
+                        error: "SKU already exists in the database"
+                    });
+                }
+            } catch (error) {
+                console.error(error);
+                return res.status(400).send({
+                    error: error.message
+                });
             }
-        });
-
-        if (existingProduct && existingProduct.productid !== productId) {
-            console.log("------> Product SKU already exists");
-            return res.status(403).send({
-                error: "Product SKU already exists"
-            });
         }
 
         const updatedProduct = await product.update({
-            productName: productName,
-            description: productDescription,
-            sku: productSku,
-            manufacturer: productManufacturer,
-            quantity: productQuantity,
+            name: name,
+            description: description,
+            sku: sku,
+            manufacturer: manufacturer,
+            quantity: quantity,
         });
-
         return res.json(updatedProduct);
     } catch (error) {
         console.error(error);
@@ -649,8 +666,7 @@ app.put("/v1/product/:productid", async(req, res) => {
     }
 })
 
-// Update product with PATCH
-app.patch("/v1/product/:productid", async(req, res) => {
+app.patch("/v1/product/:productId", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -672,9 +688,9 @@ app.patch("/v1/product/:productid", async(req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await Users.findOne({
-            attributes: ["accountid", "password"],
+            attributes: ["id", "password"],
             where: {
-                email: inputEmailAddress,
+                username: inputEmailAddress,
             },
         });
 
@@ -692,32 +708,12 @@ app.patch("/v1/product/:productid", async(req, res) => {
                 error: "Incorrect Password"
             });
         }
-
-        const userId = user.accountid;
-        console.log(userId);
-        console.log("------> User Logged in");
-
-        const productId = req.params.productid;
-        const {
-            productname,
-            productdescription,
-            productsku,
-            productmanufacturer,
-            productquantity
-        } = req.body;
-        const ownerId = userId;
-
-        if (productquantity !== undefined && (!Number.isInteger(productquantity) || productquantity < 0)) {
-            console.log("------> Product quantity invalid");
-            return res.status(400).send({
-                error: "Invalid product quantity"
-            });
-        }
+        const productId = req.params.productId;
 
         const product = await Products.findOne({
             where: {
-                productid: productId,
-                accountid: ownerId
+                id: productId,
+                owner_user_id: user.id
             }
         });
 
@@ -728,28 +724,42 @@ app.patch("/v1/product/:productid", async(req, res) => {
             });
         }
 
-        if(productsku !== undefined) {
-            const existingProduct = await Products.findOne({
-                where: {
-                    sku: productsku,
-                    accountid: accountId
-                }
-            });
+        const name = req.body.name || product.name;
+        const description = req.body.description || product.description;
+        const sku = req.body.sku || product.sku;
+        const manufacturer = req.body.manufacturer || product.manufacturer;
+        const quantity = req.body.quantity || product.quantity;
 
-            if (existingProduct && existingProduct.productid !== productId) {
-                console.log("------> Product SKU already exists");
-                return res.status(403).send({
-                    error: "Product SKU already exists"
+        if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 0)) {
+            console.log("------> Product quantity invalid");
+            return res.status(400).send({
+                error: "Invalid product quantity"
+            });
+        }
+
+        if (sku && sku !== product.sku) {
+            try {
+                const existingProduct = await Products.findOne({ where: { sku } });
+                if (existingProduct) {
+                    console.log("------> SKU already exists in the database");
+                    return res.status(400).send({
+                        error: "SKU already exists in the database"
+                    });
+                }
+            } catch (error) {
+                console.error(error);
+                return res.status(400).send({
+                    error: error.message
                 });
             }
         }
 
         const updatedProduct = await product.update({
-            productName: productname || product.productName,
-            description: productdescription || product.productDescription,
-            sku: productsku || product.productSku,
-            manufacturer: productmanufacturer || product.productManufacturer,
-            quantity: productquantity || product.productQuantity,
+            name: name,
+            description: description,
+            sku: sku,
+            manufacturer: manufacturer,
+            quantity: quantity,
         });
         return res.json(updatedProduct);
     } catch (error) {
@@ -758,16 +768,16 @@ app.patch("/v1/product/:productid", async(req, res) => {
             error: error.message
         });
     }
-})
+});
 
 // Get product by ID
 app.get("/v1/product/:productId", async (req, res) => {
     try {
         const productId = req.params.productId;
         const product = await Products.findOne({
-            attributes: ["productid", "productName", "description", "sku", "manufacturer", "quantity", "accountid"],
+            attributes: ["id", "name", "description", "sku", "manufacturer", "quantity", "date_added", "date_last_updated", "owner_user_id"],
             where: {
-                productid: productId,
+                id: productId,
             }
         });
 
@@ -777,7 +787,17 @@ app.get("/v1/product/:productId", async (req, res) => {
                 error: "Product not found"
             });
         }
-        return res.status(200).json(product);
+        return res.status(200).json({
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            sku: product.sku,
+            manufacturer: product.manufacturer,
+            quantity: product.quantity,
+            date_added: product.date_added,
+            date_last_updated: product.date_last_updated,
+            owner_user_id: product.owner_user_id
+        });
     } catch (error) {
         console.error(error);
         return res.status(400).send({

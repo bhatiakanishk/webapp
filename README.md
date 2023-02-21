@@ -1,4 +1,4 @@
-# CSYE 6225fghjk
+# CSYE 6225
 Assignments for CSYE 6225
 
 ## Prerequisites
@@ -52,19 +52,19 @@ Sample to add new user:
 ```
 {
     "username": "login@gmail.com",
-    "firstname": "Kanishk",
-    "lastname": "Bhatia",
+    "first_name": "Kanishk",
+    "last_name": "Bhatia",
     "password": "12345"
 }
 
 Sample to add new product:
 
 {
-    "productname": "Galaxy S22",
-    "productdescription": "Smartphone",
-    "productsku": "1",
-    "productmanufacturer": "Samsung",
-    "productquantity": 50
+    "name": "Galaxy S22",
+    "description": "Smartphone",
+    "sku": "1",
+    "manufacturer": "Samsung",
+    "quantity": 50
 }
 ```
 
