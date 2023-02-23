@@ -70,3 +70,11 @@ Sample to add new product:
 
 ## Running the test
 npm run test
+
+    // inline = [
+    //   "aws s3 cp s3://${var.s3_bucket}/${var.s3_key} /tmp/${var.s3_key}",
+    //   "sudo mkdir /home/${var.ssh_username}/my_folder",
+    //   "sudo unzip /tmp/${var.s3_key} -d /home/${var.ssh_username}/my_folder",
+    //   "sudo chown -R ${var.ssh_username}:${var.ssh_username} /home/${var.ssh_username}/my_folder",
+    //   "sudo rm /tmp/${var.s3_key}"
+    // ]
