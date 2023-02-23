@@ -16,3 +16,13 @@ sudo npm install -g bcrypt
 sudo npm install -g crypto
 sudo npm install -g mysql
 sudo npm install -g mysql2
+
+sudo mkdir -p /home/ec2-user/webapp
+
+# Set permissions for webapp directory
+sudo chown -R ec2-user:ec2-user /home/ec2-user/webapp
+sudo chmod -R 755 /home/ec2-user/webapp
+
+# Copy files to webapp directory
+sudo cp /home/ec2-user/index.js /home/ec2-user/webapp/
+sudo cp /home/ec2-user/package.json /home/ec2-user/webapp/

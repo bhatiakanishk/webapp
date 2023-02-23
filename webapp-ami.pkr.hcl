@@ -61,6 +61,14 @@ build {
   sources = [
     "source.amazon-ebs.linux2"
   ]
+  provisioner "file" {
+    source      = "index.js"
+    destination = "/home/ec2-user/"
+  }
+  provisioner "file" {
+    source      = "package.json"
+    destination = "/home/ec2-user/"
+  }
   provisioner "shell" {
     environment_vars = [
       "DEBIAN_FRONTEND=noninteractive",
