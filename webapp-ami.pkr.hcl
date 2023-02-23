@@ -68,7 +68,7 @@ build {
   provisioner "file" {
     source      = "package.json"
     destination = "/home/ec2-user/"
-  }
+  }sssssssssssssssssssssssssss
   provisioner "file" {
     source      = "server.d.ts"
     destination = "/home/ec2-user/"
@@ -77,6 +77,7 @@ build {
     source      = "server.service"
     destination = "/home/ec2-user/"
   }
+
   provisioner "shell" {
     environment_vars = [
       "DEBIAN_FRONTEND=noninteractive",
