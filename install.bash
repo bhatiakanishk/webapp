@@ -17,7 +17,7 @@ sudo npm install -g crypto
 sudo npm install -g mysql
 sudo npm install -g mysql2
 
-#make directory
+# Make directory
 sudo mkdir -p /home/ec2-user/webapp
 
 # Set permissions for webapp directory
