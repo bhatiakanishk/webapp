@@ -27,3 +27,5 @@ sudo chmod -R 755 /home/ec2-user/webapp
 # Copy files to webapp directory
 sudo cp /home/ec2-user/index.js /home/ec2-user/webapp/
 sudo cp /home/ec2-user/package.json /home/ec2-user/webapp/
+sudo cp /home/ec2-user/server.d.ts /home/ec2-user/webapp/
+sudo cp /home/ec2-user/server.service /home/ec2-user/webapp/
