@@ -23,14 +23,3 @@ sudo npm install -g sequelize
 
 # MariaDB Server
 sudo yum -y install mariadb-server
-sudo systemctl start mariadb
-
-sudo mysql <<MYSQL_SCRIPT
-CREATE DATABASE userDB;
-CREATE DATABASE productDB;
-drop user root@localhost;
-FLUSH PRIVILEGES;
-CREATE USER 'root'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON userDB.* TO 'root'@'localhost';
-GRANT ALL PRIVILEGES ON productDB.* TO 'root'@'localhost';
-MYSQL_SCRIPT
