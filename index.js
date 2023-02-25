@@ -1,7 +1,8 @@
 const express = require("express");
 const app = express();
+const bcrypt = require("bcrypt")
 const crypto = require("crypto");
-module.exports = app;
+
 
 // Sequelize ORM
 const {
@@ -17,7 +18,7 @@ function generateRandomInt(min, max) {
 
 // Parameters to create user table
 const sequelize = new Sequelize('userDB', 'root', 'password', {
-    host: 'localhost',
+    host: '127.0.0.1',
     dialect: 'mysql',
     port: '3306'
 });
@@ -73,66 +74,61 @@ sequelize.sync().then(() => {
     console.error('Unable to create table : ', error);
 });
 
-// Set port number to 8080
-const port = "8080"
-app.listen(port, () => console.log(`Server Started on port ${port}...`))
-const bcrypt = require("bcrypt")
-
 // Middleware to read incoming requests
 app.use(express.json())
 
 //Create User
 app.post("/v1/user", async (req, res) => {
-    const id = generateRandomInt(1, 1000);;
+    const id = generateRandomInt(1, 1000);
     const username = req.body.username;
     const first_name = req.body.first_name;
     const last_name = req.body.last_name;
-    const hashedPassword = await bcrypt.hash(req.body.password, 10);
-
+    const hashedPassword = bcrypt.hashSync(data=req.body.password, salt=10);
     // Email Validation
     let regex = new RegExp('[a-z0-9]+@[a-z]+\.[a-z]{2,3}');
-    let checkemail = [username];
-    checkemail.forEach((address) => {
-        // console.log(regex.test(address))
-        // console.log(emailaddress)
-        if (regex.test(address) == false) {
-            console.log("------> Please enter a valid email address")
-            res.sendStatus(400)
-        } else {
-            Users.findOne({
-                    attributes: ['username'],
-                    where: {
-                        username: username
-                    },
-                })
-                .then(find_user => {
-                    if (find_user == null) {
-                        Users.create({
-                                id: id,
-                                username: username,
-                                first_name: first_name,
-                                last_name: last_name,
-                                password: hashedPassword,
-                            })
-                            .then(user => res.status(201).send({
-                                message: 'User Created',
-                                id: user.id,
-                                username: user.username,
-                                first_name: user.first_name,
-                                last_name: user.last_name,
-                                account_created: user.account_created,
-                                account_updated: user.account_updated
-                            }))
-                            .catch(err => res.sendStatus(400).json({
-                                error: err.message
-                            }))
-                    } else {
-                        console.log("------> User already exists")
-                        res.sendStatus(400)
-                    }
-                })
-        }
-    });
+    // console.log(regex.test(address))
+    // console.log(emailaddress)
+    if (regex.test(username) == false) {
+        console.log("------> Please enter a valid email address")
+        res.sendStatus(400)
+    } else {
+        Users.findOne({
+                attributes: ['username'],
+                where: {
+                    username: username
+                },
+            })
+            .then(find_user => {
+                if (find_user == null) {
+                    Users.create({
+                            id: id,
+                            username: username,
+                            first_name: first_name,
+                            last_name: last_name,
+                            password: hashedPassword,
+                        })
+                        .then(user => res.status(201).send({
+                            message: 'User Created',
+                            id: user.id,
+                            username: user.username,
+                            first_name: user.first_name,
+                            last_name: user.last_name,
+                            account_created: user.account_created,
+                            account_updated: user.account_updated
+                        }))
+                        .catch(err => res.sendStatus(400).json({
+                            error: err.message
+                        }))
+                } else {
+                    console.log("------> User already exists")
+                    res.sendStatus(400)
+                }
+            })
+            .catch(err => {
+                console.log(err)
+                res.sendStatus(400)
+            })
+    }
 });
 
 // User Login
@@ -180,55 +176,65 @@ app.get("/login", async (req, res) => {
 
 // Get User Info
 app.get("/v1/user/:userid", async (req, res) => {
-    const input_id = req.params.userid;
-
+    let input_id = req.params.userid;
+    try {
+        input_id = parseInt(input_id)
+    } catch (error) {
+        console.log("Error parsing id")
+        res.sendStatus(400)
+    }
     if (req.headers.authorization == null) {
         console.log("------> No credentials passed")
-        res.sendStatus(401).end()
+        res.sendStatus(401)
     } else {
         const auth_header = req.headers.authorization;
         var auth = new Buffer.from(auth_header.split(' ')[1], 'base64').toString().split(':');
+        console.log(auth)
         var input_emailaddress = auth[0];
         var input_password = auth[1];
-
         if (input_emailaddress == null || input_password == null) {
             console.log("------> Email Address or Password Not Found")
-            res.sendStatus(401).end()
+            res.sendStatus(401)
         } else {
-            Users.findAll({
-                    attributes: ['username', 'id', 'first_name', 'last_name', 'account_created', 'account_updated'],
+            Users.findOne({
+                    attributes: ['username', 'password', 'id', 'first_name', 'last_name', 'account_created', 'account_updated'],
                     where: {
                         id: input_id,
                     },
                 })
                 .then(find_user => {
                     if (find_user != "") {
-                        console.log(find_user)
-                        Users.findOne({
-                                attributes: ['username', 'password'],
-                                where: {
-                                    id: input_id,
-                                },
-                            })
-                            .then(find_password => {
-                                bcrypt.compare(input_password, find_password.password, function (err, compare_results) {
-                                    if (compare_results) {
-                                        console.log("------> User Logged in")
-                                        if (find_password.username == input_emailaddress) {
-                                            res.json([find_user]).end()
-                                        } else {
-                                            console.log("------> Account ID Mismatch")
-                                            res.sendStatus(403).end()
-                                        }
-                                    } else {
-                                        console.log("------> Incorrect Password")
-                                        res.sendStatus(401).end()
-                                    }
-                                })
-                            })
+                        user_password = find_user.password
+                        console.log(input_password, user_password)
+                        bcrypt.compare(input_password, user_password, function (err, compare_results) {
+                            if (compare_results) {
+                                console.log("------> User Logged in")
+                                if (find_user.username == input_emailaddress) {
+                                    res.status(201).send({
+                                        message: 'User Found',
+                                        id: find_user.id,
+                                        username: find_user.username,
+                                        first_name: find_user.first_name,
+                                        last_name: find_user.last_name,
+                                        account_created: find_user.account_created,
+                                        account_updated: find_user.account_updated
+                                    })
+                                } else {
+                                    console.log("------> Account ID Mismatch")
+                                    res.sendStatus(403)
+                                }
+                            } else if(err) {
+                                console.log("------> Incorrect Password", err)
+                                res.sendStatus(401)
+                            }
+                        })
                     } else {
-                        res.sendStatus(401).end()
+                        res.sendStatus(401)
                     }
+                })
+                .catch(err => {
+                    console.log(err)
+                    res.sendStatus(400)
                 })
         }
     }
@@ -236,7 +242,13 @@ app.get("/v1/user/:userid", async (req, res) => {
 
 // Update User Info
 app.put("/v1/user/:userid", async (req, res) => {
-    const input_id = req.params.userid;
+    let input_id = req.params.userid;
+    try {
+        input_id = parseInt(input_id)
+    } catch (error) {
+        console.log("Error parsing id")
+        res.sendStatus(400)
+    }
     const new_hash = await bcrypt.hash(req.body.password, 10);
     const new_first_name = req.body.first_name;
     const new_last_name = req.body.last_name;
@@ -284,20 +296,20 @@ app.put("/v1/user/:userid", async (req, res) => {
                                                 })
                                                 .then(r3 => {
                                                     console.log("Account details of user updated successfully")
-                                                    res.status(204).end()
+                                                    res.status(204)
                                                 })
                                         } else {
                                             console.log("------> Account ID Mismatch")
-                                            res.sendStatus(403).end()
+                                            res.sendStatus(403)
                                         }
                                     } else {
                                         console.log("------> Incorrect Password")
-                                        res.sendStatus(401).end()
+                                        res.sendStatus(401)
                                     }
                                 })
                             })
                     } else {
-                        res.sendStatus(401).end()
+                        res.sendStatus(401)
                     }
                 })
         }
@@ -805,3 +817,9 @@ app.get("/v1/product/:productId", async (req, res) => {
         });
     }
 });
+
+// Set port number to 8080
+const port = "8080"
+app.listen(port, () => console.log(`Server Started on port ${port}...`))
+
+module.exports = app;
