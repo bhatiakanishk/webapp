@@ -18,6 +18,5 @@ jobs:
           command: validate
           arguments: -syntax-only
           target: webapp-ami.pkr.hcl
-          
         env:
           PACKER_LOG: 1
