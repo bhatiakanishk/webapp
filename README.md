@@ -60,6 +60,8 @@ npm start
 
 Build the AMI with by running the following code:
 ```
+packer init .
+
 packer fmt .
 
 packer validate .
