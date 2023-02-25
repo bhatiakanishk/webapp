@@ -28,7 +28,7 @@ variable "subnet_id" {
 }
 
 source "amazon-ebs" "linux2" {
-  ami_name      = "amazon-linux-2"
+  ami_name      = "amazon-linux-2-${formatdate("YYYY_MM_DD_hh_mm_ss", timestamp())}"
   ami_users     = ["936367200870"]
   instance_type = "t2.micro"
   region        = "${var.aws_region}"
