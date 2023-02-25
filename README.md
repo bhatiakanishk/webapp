@@ -56,9 +56,9 @@ In the git directory, run the following command to install the dependencies and 
 npm start
 ```
 
-## Running the code with Packer
+## Building the AMI with Packer
 
-Build the AMI with by running the following code:
+Build the AMI by running the following code:
 ```
 packer init .
 

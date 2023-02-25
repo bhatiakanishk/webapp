@@ -8,18 +8,29 @@ sudo yum upgrade -y
 curl -sL https://rpm.nodesource.com/setup_14.x | sudo bash -
 sudo yum install -y nodejs
 
-# Install global NPM packages
-sudo npm install -g npm
-sudo npm install -g express
-sudo npm install -g express body-parser --save
-sudo npm install -g bcryptjs
-sudo npm install -g crypto
-sudo npm install -g pm2
-
-sudo cp /home/ec2-user/server.service /etc/systemd/system
-
-sudo npm install -g mysql2
-sudo npm install -g sequelize
-
 # MariaDB Server
 sudo yum -y install mariadb-server
+sudo systemctl start mariadb
+sudo systemctl enable mariadb
+
+# Create database schema
+sudo mysql -u root
+sudo mysql <<MYSQL_SCRIPT
+CREATE DATABASE userDB;
+CREATE DATABASE productDB;
+drop user root@localhost;
+FLUSH PRIVILEGES;
+CREATE USER 'root'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON userDB.* TO 'root'@'localhost';
+GRANT ALL PRIVILEGES ON productDB.* TO 'root'@'localhost';
+MYSQL_SCRIPT
+
+# Install packages
+cd /home/ec2-user/ && npm install
+wait
+# PM2
+sudo npm install -g pm2
+sudo pm2 start index.js --name csye6225 --log ./csye6225.log
+sudo pm2 startup systemd
+sudo pm2 save
+sudo pm2 list
