@@ -70,3 +70,8 @@ Sample to add new product:
 
 ## Running the test
 npm run test
+
+# Change directory to webapp
+sudo systemctl status mariadb
+npm install
+node index.js
