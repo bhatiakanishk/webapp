@@ -74,7 +74,7 @@ sequelize.sync().then(() => {
 });
 
 // Set port number to 8080
-const port = "8080"
+const port = "12345"
 app.listen(port, () => console.log(`Server Started on port ${port}...`))
 const bcrypt = require("bcrypt")
 

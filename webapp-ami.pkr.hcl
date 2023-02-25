@@ -27,18 +27,9 @@ variable "subnet_id" {
   default = "subnet-0f9d10244e5b12fd8"
 }
 
-variable "s3_bucket" {
-  type    = string
-  default = "csye6225-bucket"
-}
-
-variable "s3_key" {
-  type    = string
-  default = "webapp.zip"
-}
-
 source "amazon-ebs" "linux2" {
   ami_name      = "amazon-linux-2"
+  ami_users     = ["936367200870"]
   instance_type = "t2.micro"
   region        = "${var.aws_region}"
   vpc_id        = "vpc-096db90b7230c22d8"

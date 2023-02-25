@@ -6,7 +6,7 @@ After=network.target
 Environment=NODE_PORT=8080
 Type=simple
 User=ec2-user
-ExecStart=/usr/bin/node /home/ec2-user/webapp/index.js
+ExecStart=/usr/bin/node /home/ec2-user/index.js
 Restart=on-failure
 
 [Install]
