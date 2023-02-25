@@ -1,12 +1,15 @@
 # CSYE 6225
+
 Assignments for CSYE 6225
 
 ## Prerequisites
 
 ### Github
+
 A fork is made from the organization called kanishkbhatia/ webapp. The repository on the fork is then cloned locally using the 'git clone' command and using SSH.
 
 ### Node
+
 Install node and npm by running the following commands:
 
 ```
@@ -16,6 +19,7 @@ sudo apt install npm
 ```
 
 ### MySQL Workbench
+
 Run a MySQL connection on:
 ```
 host: localhost
@@ -34,13 +38,37 @@ userDB
 productDB
 ```
 
-## Running the code
+### Packer
+
+Install packer
+```
+curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+
+sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+
+sudo apt-get update && sudo apt-get install packer
+```
+
+## Running the code with node
+
 In the git directory, run the following command to install the dependencies and run the code:
 ```
 npm start
 ```
 
+## Running the code with Packer
+
+Build the AMI with by running the following code:
+```
+packer fmt .
+
+packer validate .
+
+packer build webapp-ami.pkr.hcl
+```
+
 ## Postman
+
 Postman needs to be installed for testing the API calls
 ```
 http://127.0.0.1:8080/{requiredRequest}
@@ -69,9 +97,6 @@ Sample to add new product:
 ```
 
 ## Running the test
-npm run test
 
-# Change directory to webapp
-sudo systemctl status mariadb
-npm install
-node index.js
+
+npm run test

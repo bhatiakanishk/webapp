@@ -27,7 +27,7 @@ jobs:
         with:
           command: build
           arguments: "-color=false -on-error=abort"
-          target: ami.pkr.hcl
-
+          target: webapp-ami.pkr.hcl
+          
         env:
           PACKET_LOG: 1
