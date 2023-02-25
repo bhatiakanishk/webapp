@@ -1,4 +1,4 @@
-# CSYE 6225
+# CSYE 6225 - Network and Cloud
 
 Assignments for CSYE 6225
 
