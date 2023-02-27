@@ -2,7 +2,7 @@
 
 Assignments for CSYE 6225
 
-## Prerequisites
+# Prerequisites
 
 ### Github
 
