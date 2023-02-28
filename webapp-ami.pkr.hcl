@@ -44,7 +44,7 @@ source "amazon-ebs" "linux2" {
     most_recent = true
     owners      = ["amazon"]
   }
-  #ssh_username = "${var.ssh_username}"
+  ssh_username = "${var.ssh_username}"
 }
 
 build {
