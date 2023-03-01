@@ -2,12 +2,8 @@ const express = require("express");
 const app = express();
 const bcrypt = require("bcrypt")
 const crypto = require("crypto");
-
-
-// Sequelize ORM
-const {
-    Sequelize
-} = require('sequelize');
+const { Sequelize } = require('sequelize');
+require('dotenv').config({path:'/home/ec2-user/webapp/.env'})
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -395,7 +391,7 @@ app.post("/v1/product", async (req, res) => {
         const password = auth[1];
         if (!inputEmailAddress || !password) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }
@@ -504,7 +500,7 @@ app.delete("/v1/product/:productId", async (req, res) => {
         const password = auth[1];
         if (!inputEmailAddress || !password) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }
@@ -574,7 +570,7 @@ app.put("/v1/product/:productId", async (req, res) => {
         const password = auth[1];
         if (!inputEmailAddress || !password) {
             console.log("------> Please enter a valid email and password");
-            return res.status(400).send({
+            return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
         }

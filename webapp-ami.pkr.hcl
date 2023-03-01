@@ -26,13 +26,21 @@ variable "subnet_id" {
   type    = string
   default = "subnet-0f9d10244e5b12fd8"
 }
+variable "ami_user" {
+  type    = string
+  default = "936367200970"
+}
+variable "vpc_id" {
+  type    = string
+  default = "vpc-096db90b7230c22d8"
+}
 
 source "amazon-ebs" "linux2" {
   ami_name      = "amazon-linux-2-${formatdate("YYYY_MM_DD_hh_mm_ss", timestamp())}"
-  ami_users     = ["936367200870"]
+  ami_users     = ["${var.ami_user}"]
   instance_type = "t2.micro"
   region        = "${var.aws_region}"
-  vpc_id        = "vpc-096db90b7230c22d8"
+  vpc_id        = "${var.vpc_id}"
   subnet_id     = "${var.subnet_id}"
   source_ami_filter {
     filters = {
