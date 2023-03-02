@@ -1,12 +1,16 @@
 const express = require("express");
 const app = express();
-const bcrypt = require("bcrypt")
+const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const { Sequelize } = require('sequelize');
-require('dotenv').config({path:'/home/ec2-user/webapp/.env'});
-fs = require('fs'),
-AWS = require('aws-sdk');
-let StatsD = require('node-statsd'), client = new StatsD();
+require('dotenv').config({ path: '/home/ec2-user/webapp/.env' });
+const AWS = require('aws-sdk');
+const multer = require('multer');
+const multerS3 = require('multer-s3');
+const { S3Client } = require("@aws-sdk/client-s3");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
+
+
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -14,8 +18,6 @@ function generateRandomInt(min, max) {
     const adjustedInt = (randomInt % (max - min + 1)) + min;
     return adjustedInt;
 }
-
-console.log(process.env.SQLUSER)
 
 // Parameters to create user table
 const sequelize = new Sequelize({
@@ -26,13 +28,6 @@ const sequelize = new Sequelize({
     port: '3306',
     dialect: 'mysql'
 });
-
-AWS.config.update({region: 'us-east-1'});
-
-var s3 = new AWS.S3();
-
-
-console.log(process.env.BUCKETNAME)
 
 // Connection of user table to the database
 sequelize.authenticate().then(() => {
@@ -94,7 +89,7 @@ app.post("/v1/user", async (req, res) => {
     const username = req.body.username;
     const first_name = req.body.first_name;
     const last_name = req.body.last_name;
-    const hashedPassword = bcrypt.hashSync(data=req.body.password, salt=10);
+    const hashedPassword = bcrypt.hashSync(data = req.body.password, salt = 10);
     // Email Validation
     let regex = new RegExp('[a-z0-9]+@[a-z]+\.[a-z]{2,3}');
     if (regex.test(username) == false) {
@@ -137,49 +132,6 @@ app.post("/v1/user", async (req, res) => {
                 console.log(err)
                 res.sendStatus(400)
             })
-    }
-});
-
-// User Login
-app.get("/login", async (req, res) => {
-    if (req.headers.authorization == null) {
-        console.log("------> Please enter valid email and password")
-        res.sendStatus(400)
-    } else {
-        const auth_header = req.headers.authorization;
-        var auth = new Buffer.from(auth_header.split(' ')[1], 'base64').toString().split(':');
-        if (auth == null) {
-            console.log("------> Please enter valid email and password")
-            res.sendStatus(400)
-        } else {
-            var input_emailaddress = auth[0];
-            var passworduser = auth[1];
-            if (input_emailaddress == null || passworduser == null) {
-                console.log("------> Please enter valid email and password")
-                res.sendStatus(400)
-            } else {
-                const hashedPassword = await bcrypt.hash(passworduser, 10);
-                Users.findOne({
-                        attributes: ['password'],
-                        where: {
-                            username: input_emailaddress,
-                        },
-                    })
-                    .then(find_user => {
-                        bcrypt.compare(passworduser, find_user.password, function (err, compare_results) {
-                            if (compare_results) {
-                                console.log("------> User Logged in")
-                                res.sendStatus(200)
-                            } else {
-                                console.log("------> Incorrect Password")
-                                res.sendStatus(400)
-                            }
-                        })
-                    }).catch(err => res.sendStatus(400).json({
-                        error: err.message
-                    }))
-            }
-        }
     }
 });
 
@@ -232,7 +184,7 @@ app.get("/v1/user/:userid", async (req, res) => {
                                     console.log("------> Account ID Mismatch")
                                     res.sendStatus(403)
                                 }
-                            } else if(err) {
+                            } else if (err) {
                                 console.log("------> Incorrect Password", err)
                                 res.sendStatus(401)
                             }
@@ -641,7 +593,11 @@ app.put("/v1/product/:productId", async (req, res) => {
 
         if (sku && sku !== product.sku) {
             try {
-                const existingProduct = await Products.findOne({ where: { sku } });
+                const existingProduct = await Products.findOne({
+                    where: {
+                        sku
+                    }
+                });
                 if (existingProduct) {
                     console.log("------> SKU already exists in the database");
                     return res.status(400).send({
@@ -672,6 +628,7 @@ app.put("/v1/product/:productId", async (req, res) => {
     }
 })
 
+// Update product with PATCH
 app.patch("/v1/product/:productId", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -745,7 +702,11 @@ app.patch("/v1/product/:productId", async (req, res) => {
 
         if (sku && sku !== product.sku) {
             try {
-                const existingProduct = await Products.findOne({ where: { sku } });
+                const existingProduct = await Products.findOne({
+                    where: {
+                        sku
+                    }
+                });
                 if (existingProduct) {
                     console.log("------> SKU already exists in the database");
                     return res.status(400).send({
@@ -808,6 +769,158 @@ app.get("/v1/product/:productId", async (req, res) => {
         console.error(error);
         return res.status(400).send({
             error: error.message
+        });
+    }
+});
+
+// Create table "Image" with columns
+const Image = sequelize.define('Image', {
+    image_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        primaryKey: true,
+        autoIncrement: true,
+        unique: true
+    },
+    product_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    file_name: {
+        type: Sequelize.STRING,
+        allowNull: false,
+    },
+    date_created: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW
+    },
+    s3_bucket_path: {
+        type: Sequelize.STRING,
+        allowNull: false,
+    },
+});
+
+Image.belongsTo(Products, { foreignKey: 'product_id' });
+Products.hasMany(Image, { foreignKey: 'product_id' });
+
+// const product = await Products.findOne({
+//     where: { id: req.params.productId },
+//     include: { model: Users, attributes: ['id'] }
+// });
+
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    }
+});
+
+const upload = multer({
+    storage: multerS3({
+        s3: s3,
+        bucket: process.env.BUCKETNAME,
+        key: function(req, file, cb) {
+            const filename = file.originalname;
+            const extension = mime.extension(file.mimetype);
+            cb(null, `${Users.id}/${req.params.productId}/${filename}.${extension}`);
+        }
+    })
+});
+
+// Post Image
+app.post("/v1/product/:productId/image", upload.single('image'), async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password"
+            });
+        }
+
+        const auth = new Buffer.from(authHeader.split(" ")[1], "base64").toString().split(":");
+        const inputEmailAddress = auth[0];
+        const password = auth[1];
+        if (!inputEmailAddress || !password) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password"
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await Users.findOne({
+            attributes: ["id", "password"],
+            where: {
+                username: inputEmailAddress,
+            },
+        });
+
+        if (!user) {
+            console.log("------> User not found");
+            return res.status(404).send({
+                error: "User not found"
+            });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            console.log("------> Incorrect Password");
+            return res.status(401).send({
+                error: "Incorrect Password"
+            });
+        }
+        const id = req.params.productId;
+        const product = await Products.findByPk(id);
+
+        if (!product) {
+            console.log("------> Product not found");
+            return res.status(404).send({
+                error: "Product not found"
+            });
+        }
+        if (user.id != product.owner_user_id) {
+            console.log("------> Not authorized to upload image for this product");
+            return res.status(403).send({
+                error: "Not authorized to upload image for this product"
+            });
+        }
+        const file = req.file;
+        const putObjectCommand = new PutObjectCommand({
+            Bucket: process.env.BUCKETNAME,
+            Key: `${user.id}/${req.params.productId}/${file.originalname}.${mime.extension(file.mimetype)}`,
+            Body: file.buffer,
+            ContentType: file.mimetype
+        });
+        await s3.send(putObjectCommand);
+        const image = await Image.create({
+            product_id: product.id,
+            file_name: file.originalname,
+            s3_bucket_path: `https://${process.env.BUCKETNAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${user.id}/${req.params.productId}/${file.originalname}.${mime.extension(file.mimetype)}`,
+            metadata: {
+                contentType: file.mimetype,
+                size: file.size
+            }
+        });
+
+        console.log("------> Image uploaded successfully");
+        return res.status(200).send({
+            message: "Image uploaded successfully",
+            data: {
+                image_id: image.image_id,
+                product_id: image.product_id,
+                file_name: image.file_name,
+                date_created: image.date_created,
+                s3_bucket_path: image.s3_bucket_path
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(400).send({
+            error: error.message,
         });
     }
 });
