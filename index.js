@@ -951,19 +951,17 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         if (!authHeader) {
             console.log("------> Please enter a valid email and password");
             return res.status(401).send({
-                error: "Please enter a valid email and password",
+                error: "Please enter a valid email and password"
             });
         }
 
-        const auth = new Buffer.from(authHeader.split(" ")[1], "base64")
-            .toString()
-            .split(":");
+        const auth = new Buffer.from(authHeader.split(" ")[1], "base64").toString().split(":");
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
             console.log("------> Please enter a valid email and password");
             return res.status(401).send({
-                error: "Please enter a valid email and password",
+                error: "Please enter a valid email and password"
             });
         }
 
@@ -978,7 +976,7 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         if (!user) {
             console.log("------> User not found");
             return res.status(404).send({
-                error: "User not found",
+                error: "User not found"
             });
         }
 
@@ -986,56 +984,52 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         if (!isPasswordValid) {
             console.log("------> Incorrect Password");
             return res.status(401).send({
-                error: "Incorrect Password",
+                error: "Incorrect Password"
             });
         }
 
-        if (!req.params.productId) {
-            console.log("------> Product ID is required");
-            return res.status(400).send({
-                error: "Product ID is required"
-            });
-        }
+        const productId = req.params.productId;
+        const product = await Products.findByPk(productId);
 
-        const product = await Products.findByPk(req.params.productId);
         if (!product) {
             console.log("------> Product not found");
             return res.status(404).send({
-                error: "Product not found",
+                error: "Product not found"
             });
         }
-        
-        const image = await Image.findOne({
-            where: {
-                product_id: product.id,
-                image_id: req.params.image_id,
-            },
-        });
+
+        if (user.id !== product.owner_user_id) {
+            console.log("------> Not authorized to delete image for this product");
+            return res.status(403).send({
+                error: "Not authorized to delete image for this product"
+            });
+        }
+
+        const imageId = req.params.image_id;
+        const image = await Image.findByPk(imageId);
 
         if (!image) {
             console.log("------> Image not found");
             return res.status(404).send({
-                error: "Image not found",
+                error: "Image not found"
             });
         }
 
-        if (user.id != product.owner_user_id) {
-            console.log("------> Not authorized to delete image for this product");
-            return res.status(403).send({
-                error: "Not authorized to delete image for this product",
-            });
-        }
-
+        // delete image from S3 bucket
         const deleteObjectCommand = new DeleteObjectCommand({
             Bucket: process.env.BUCKETNAME,
-            Key: `${user.id}/${req.params.productId}/${image.file_name}.${mime.getExtension(image.metadata.contentType)}`,
+            Key: image.s3_bucket_path.substring(image.s3_bucket_path.lastIndexOf('/') + 1)
         });
         await s3.send(deleteObjectCommand);
+
+        // delete image from database
         await image.destroy();
+
         console.log("------> Image deleted successfully");
         return res.status(200).send({
             message: "Image deleted successfully",
         });
+
     } catch (error) {
         console.error(error);
         return res.status(400).send({
