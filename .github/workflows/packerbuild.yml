@@ -22,7 +22,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_DEV_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Initalize packer
+      - name: Initialize packer
         uses: hashicorp/packer-github-actions@master
         with:
           command: init
