@@ -9,8 +9,8 @@ const multer = require('multer');
 const multerS3 = require('multer-s3');
 const { S3Client } = require("@aws-sdk/client-s3");
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
-
-
+const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const mime = require('mime');
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -801,13 +801,12 @@ const Image = sequelize.define('Image', {
     },
 });
 
-Image.belongsTo(Products, { foreignKey: 'product_id' });
-Products.hasMany(Image, { foreignKey: 'product_id' });
-
-// const product = await Products.findOne({
-//     where: { id: req.params.productId },
-//     include: { model: Users, attributes: ['id'] }
-// });
+Image.belongsTo(Products, {
+    foreignKey: 'product_id'
+});
+Products.hasMany(Image, {
+    foreignKey: 'product_id'
+});
 
 const s3 = new S3Client({
     region: process.env.AWS_REGION,
@@ -821,9 +820,9 @@ const upload = multer({
     storage: multerS3({
         s3: s3,
         bucket: process.env.BUCKETNAME,
-        key: function(req, file, cb) {
+        key: function (req, file, cb) {
             const filename = file.originalname;
-            const extension = mime.extension(file.mimetype);
+            const extension = mime.getExtension(file.mimetype);
             cb(null, `${Users.id}/${req.params.productId}/${filename}.${extension}`);
         }
     })
@@ -881,16 +880,36 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
                 error: "Product not found"
             });
         }
+        if (!req.params.productId) {
+            console.log("------> Product ID is required");
+            return res.status(400).send({
+                error: "Product ID is required"
+            });
+        }
         if (user.id != product.owner_user_id) {
             console.log("------> Not authorized to upload image for this product");
             return res.status(403).send({
                 error: "Not authorized to upload image for this product"
             });
         }
+        
+        if (!req.file) {
+            console.log("------> File is required");
+            return res.status(400).send({
+                error: "File is required"
+            });
+        }
+
+        if (!req.file.mimetype) {
+            console.log("------> File type is required");
+            return res.status(400).send({
+                error: "File type is required"
+            });
+        }
         const file = req.file;
         const putObjectCommand = new PutObjectCommand({
             Bucket: process.env.BUCKETNAME,
-            Key: `${user.id}/${req.params.productId}/${file.originalname}.${mime.extension(file.mimetype)}`,
+            Key: `${user.id}/${req.params.productId}/${file.originalname}.${mime.getExtension(file.mimetype)}`,
             Body: file.buffer,
             ContentType: file.mimetype
         });
@@ -898,7 +917,7 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
         const image = await Image.create({
             product_id: product.id,
             file_name: file.originalname,
-            s3_bucket_path: `https://${process.env.BUCKETNAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${user.id}/${req.params.productId}/${file.originalname}.${mime.extension(file.mimetype)}`,
+            s3_bucket_path: `https://${process.env.BUCKETNAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${user.id}/${req.params.productId}/${file.originalname}.${mime.getExtension(file.mimetype)}`,
             metadata: {
                 contentType: file.mimetype,
                 size: file.size
@@ -915,6 +934,260 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
                 date_created: image.date_created,
                 s3_bucket_path: image.s3_bucket_path
             }
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(400).send({
+            error: error.message,
+        });
+    }
+});
+
+// Delete Image
+app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password",
+            });
+        }
+
+        const auth = new Buffer.from(authHeader.split(" ")[1], "base64")
+            .toString()
+            .split(":");
+        const inputEmailAddress = auth[0];
+        const password = auth[1];
+        if (!inputEmailAddress || !password) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password",
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await Users.findOne({
+            attributes: ["id", "password"],
+            where: {
+                username: inputEmailAddress,
+            },
+        });
+
+        if (!user) {
+            console.log("------> User not found");
+            return res.status(404).send({
+                error: "User not found",
+            });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            console.log("------> Incorrect Password");
+            return res.status(401).send({
+                error: "Incorrect Password",
+            });
+        }
+
+        if (!req.params.productId) {
+            console.log("------> Product ID is required");
+            return res.status(400).send({
+                error: "Product ID is required"
+            });
+        }
+
+        const product = await Products.findByPk(req.params.productId);
+        if (!product) {
+            console.log("------> Product not found");
+            return res.status(404).send({
+                error: "Product not found",
+            });
+        }
+        
+        const image = await Image.findOne({
+            where: {
+                product_id: product.id,
+                image_id: req.params.image_id,
+            },
+        });
+
+        if (!image) {
+            console.log("------> Image not found");
+            return res.status(404).send({
+                error: "Image not found",
+            });
+        }
+
+        if (user.id != product.owner_user_id) {
+            console.log("------> Not authorized to delete image for this product");
+            return res.status(403).send({
+                error: "Not authorized to delete image for this product",
+            });
+        }
+
+        const deleteObjectCommand = new DeleteObjectCommand({
+            Bucket: process.env.BUCKETNAME,
+            Key: `${user.id}/${req.params.productId}/${image.file_name}.${mime.getExtension(image.metadata.contentType)}`,
+        });
+        await s3.send(deleteObjectCommand);
+        await image.destroy();
+        console.log("------> Image deleted successfully");
+        return res.status(200).send({
+            message: "Image deleted successfully",
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(400).send({
+            error: error.message,
+        });
+    }
+});
+
+// Get all images for a product
+app.get("/v1/product/:productId/image", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password"
+            });
+        }
+
+        const auth = new Buffer.from(authHeader.split(" ")[1], "base64").toString().split(":");
+        const inputEmailAddress = auth[0];
+        const password = auth[1];
+        if (!inputEmailAddress || !password) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password"
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await Users.findOne({
+            attributes: ["id", "password"],
+            where: {
+                username: inputEmailAddress,
+            },
+        });
+
+        if (!user) {
+            console.log("------> User not found");
+            return res.status(404).send({
+                error: "User not found"
+            });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            console.log("------> Incorrect Password");
+            return res.status(401).send({
+                error: "Incorrect Password"
+            });
+        }
+        const id = req.params.productId;
+        const product = await Products.findByPk(id);
+
+        if (!product) {
+            console.log("------> Product not found");
+            return res.status(404).send({
+                error: "Product not found"
+            });
+        }
+
+        const images = await Image.findAll({
+            where: {
+                product_id: product.id
+            },
+            attributes: ['image_id', 'product_id', 'file_name', 'date_created', 's3_bucket_path'],
+            order: [
+                ['date_created', 'DESC']
+            ]
+        });
+
+        console.log("------> Retrieved all images successfully");
+        return res.status(200).send({
+            message: "Retrieved all images successfully",
+            data: images
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(400).send({
+            error: error.message,
+        });
+    }
+});
+
+// Get image details
+app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password"
+            });
+        }
+
+        const auth = new Buffer.from(authHeader.split(" ")[1], "base64").toString().split(":");
+        const inputEmailAddress = auth[0];
+        const password = auth[1];
+        if (!inputEmailAddress || !password) {
+            console.log("------> Please enter a valid email and password");
+            return res.status(401).send({
+                error: "Please enter a valid email and password"
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await Users.findOne({
+            attributes: ["id", "password"],
+            where: {
+                username: inputEmailAddress,
+            },
+        });
+
+        if (!user) {
+            console.log("------> User not found");
+            return res.status(404).send({
+                error: "User not found"
+            });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            console.log("------> Incorrect Password");
+            return res.status(401).send({
+                error: "Incorrect Password"
+            });
+        }
+
+        const image = await Image.findOne({
+            where: {
+                image_id: req.params.image_id
+            },
+            include: [{
+                model: Products,
+                where: {
+                    id: req.params.productId,
+                    owner_user_id: user.id
+                },
+            }]
+        });
+
+        if (!image) {
+            console.log("------> Image not found");
+            return res.status(404).send({
+                error: "Image not found"
+            });
+        }
+
+        console.log("------> Image details retrieved successfully");
+        return res.status(200).send({
+            data: image.toJSON()
         });
 
     } catch (error) {
