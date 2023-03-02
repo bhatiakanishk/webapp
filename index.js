@@ -3,7 +3,10 @@ const app = express();
 const bcrypt = require("bcrypt")
 const crypto = require("crypto");
 const { Sequelize } = require('sequelize');
-require('dotenv').config({path:'/home/ec2-user/webapp/.env'})
+require('dotenv').config({path:'/home/ec2-user/webapp/.env'});
+fs = require('fs'),
+AWS = require('aws-sdk');
+let StatsD = require('node-statsd'), client = new StatsD();
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -12,12 +15,24 @@ function generateRandomInt(min, max) {
     return adjustedInt;
 }
 
+console.log(process.env.SQLUSER)
+
 // Parameters to create user table
-const sequelize = new Sequelize('userDB', 'root', 'password', {
-    host: '127.0.0.1',
-    dialect: 'mysql',
-    port: '3306'
+const sequelize = new Sequelize({
+    database: process.env.DATABASENAME,
+    username: process.env.SQLUSER,
+    password: process.env.SQLPASSWORD,
+    host: process.env.SQLHOSTNAME,
+    port: '3306',
+    dialect: 'mysql'
 });
+
+AWS.config.update({region: 'us-east-1'});
+
+var s3 = new AWS.S3();
+
+
+console.log(process.env.BUCKETNAME)
 
 // Connection of user table to the database
 sequelize.authenticate().then(() => {
@@ -82,8 +97,6 @@ app.post("/v1/user", async (req, res) => {
     const hashedPassword = bcrypt.hashSync(data=req.body.password, salt=10);
     // Email Validation
     let regex = new RegExp('[a-z0-9]+@[a-z]+\.[a-z]{2,3}');
-    // console.log(regex.test(address))
-    // console.log(emailaddress)
     if (regex.test(username) == false) {
         console.log("------> Please enter a valid email address")
         res.sendStatus(400)
@@ -312,23 +325,8 @@ app.put("/v1/user/:userid", async (req, res) => {
     }
 });
 
-
-// Parameters to create product table
-const sequelizeProduct = new Sequelize('productDB', 'root', 'password', {
-    host: 'localhost',
-    dialect: 'mysql',
-    port: '3306'
-});
-
-// Connection of product table to the database
-sequelizeProduct.authenticate().then(() => {
-    console.log('Product table connected successfully');
-}).catch((error) => {
-    console.error('Unable to connect to the database: ', error);
-});
-
 // Create table "Products" with columns  
-const Products = sequelizeProduct.define('Products', {
+const Products = sequelize.define('Products', {
     id: {
         type: Sequelize.INTEGER,
         allowNull: false,
@@ -369,7 +367,7 @@ const Products = sequelizeProduct.define('Products', {
 })
 
 // Check for product table creation
-sequelizeProduct.sync().then(() => {
+sequelize.sync().then(() => {
     console.log('Products table created successfully!');
 }).catch((error) => {
     console.error('Unable to create table : ', error);

@@ -13,18 +13,6 @@ sudo yum -y install mariadb-server
 sudo systemctl start mariadb
 sudo systemctl enable mariadb
 
-# Create database schema
-sudo mysql -u root
-sudo mysql <<MYSQL_SCRIPT
-CREATE DATABASE userDB;
-CREATE DATABASE productDB;
-drop user root@localhost;
-FLUSH PRIVILEGES;
-CREATE USER 'root'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON userDB.* TO 'root'@'localhost';
-GRANT ALL PRIVILEGES ON productDB.* TO 'root'@'localhost';
-MYSQL_SCRIPT
-
 # Install dotenv
 sudo npm install -g dotenv
 
@@ -45,9 +33,10 @@ sudo chmod 775 /home/ec2-user/webapp/.env
 # Install packages
 cd /home/ec2-user/webapp/ && npm install
 wait
+
 # PM2
-sudo npm install -g pm2
-sudo pm2 start index.js --name csye6225 --log ./csye6225.log
-sudo pm2 startup systemd
-sudo pm2 save
-sudo pm2 list
+# sudo npm install -g pm2
+# sudo pm2 start index.js --name csye6225 --log ./csye6225.log
+# sudo pm2 startup systemd
+# sudo pm2 save
+# sudo pm2 list
