@@ -8,11 +8,6 @@ sudo yum upgrade -y
 curl -sL https://rpm.nodesource.com/setup_14.x | sudo bash -
 sudo yum install -y nodejs
 
-# MariaDB Server
-sudo yum -y install mariadb-server
-sudo systemctl start mariadb
-sudo systemctl enable mariadb
-
 # Install dotenv
 sudo npm install -g dotenv
 
@@ -33,10 +28,3 @@ sudo chmod 775 /home/ec2-user/webapp/.env
 # Install packages
 cd /home/ec2-user/webapp/ && npm install
 wait
-
-# PM2
-# sudo npm install -g pm2
-# sudo pm2 start index.js --name csye6225 --log ./csye6225.log
-# sudo pm2 startup systemd
-# sudo pm2 save
-# sudo pm2 list
