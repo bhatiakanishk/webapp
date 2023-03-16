@@ -11,6 +11,7 @@ const { S3Client } = require("@aws-sdk/client-s3");
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const mime = require('mime');
+const { defaultProvider } = require("@aws-sdk/credential-provider-node");
 
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
@@ -38,7 +39,7 @@ sequelize.authenticate().then(() => {
 
 // Healthz
 app.get('/healthz', (req, res) => {
-    res.status(200).json('OK')
+    res.status(200).json('Okay')
 })
 
 // Create table "Users" with columns  
@@ -94,7 +95,9 @@ app.post("/v1/user", async (req, res) => {
     let regex = new RegExp('[a-z0-9]+@[a-z]+\.[a-z]{2,3}');
     if (regex.test(username) == false) {
         console.log("------> Please enter a valid email address")
-        res.sendStatus(400)
+        res.sendStatus(400).send({
+            error: "Please enter a valid email address"
+        });
     } else {
         Users.findOne({
                 attributes: ['username'],
@@ -125,12 +128,16 @@ app.post("/v1/user", async (req, res) => {
                         }))
                 } else {
                     console.log("------> User already exists")
-                    res.sendStatus(400)
+                    res.sendStatus(400).send({
+                        error: "User already exists"
+                    });
                 }
             })
             .catch(err => {
                 console.log(err)
-                res.sendStatus(400)
+                res.sendStatus(400).send({
+                    error: "Failed to create new user"
+                });
             })
     }
 });
@@ -142,11 +149,15 @@ app.get("/v1/user/:userid", async (req, res) => {
         input_id = parseInt(input_id)
     } catch (error) {
         console.log("Error parsing id")
-        res.sendStatus(400)
+        res.sendStatus(400).send({
+            error: "Error parsing id"
+        });
     }
     if (req.headers.authorization == null) {
         console.log("------> No credentials passed")
-        res.sendStatus(401)
+        res.sendStatus(401).send({
+            error: "No credentials passed"
+        });
     } else {
         const auth_header = req.headers.authorization;
         var auth = new Buffer.from(auth_header.split(' ')[1], 'base64').toString().split(':');
@@ -155,7 +166,9 @@ app.get("/v1/user/:userid", async (req, res) => {
         var input_password = auth[1];
         if (input_emailaddress == null || input_password == null) {
             console.log("------> Email Address or Password Not Found")
-            res.sendStatus(401)
+            res.sendStatus(401).send({
+                error: "Email address or password not found"
+            });
         } else {
             Users.findOne({
                     attributes: ['username', 'password', 'id', 'first_name', 'last_name', 'account_created', 'account_updated'],
@@ -182,20 +195,28 @@ app.get("/v1/user/:userid", async (req, res) => {
                                     })
                                 } else {
                                     console.log("------> Account ID Mismatch")
-                                    res.sendStatus(403)
+                                    res.sendStatus(403).send({
+                                        error: "Account id mismatch"
+                                    });
                                 }
                             } else if (err) {
                                 console.log("------> Incorrect Password", err)
-                                res.sendStatus(401)
+                                res.sendStatus(401).send({
+                                    error: "Incorrect password"
+                                });
                             }
                         })
                     } else {
-                        res.sendStatus(401)
+                        res.sendStatus(401).send({
+                            error: "User not authorized"
+                        });
                     }
                 })
                 .catch(err => {
                     console.log(err)
-                    res.sendStatus(400)
+                    res.sendStatus(400).send({
+                        error: "User not found"
+                    });
                 })
         }
     }
@@ -208,7 +229,9 @@ app.put("/v1/user/:userid", async (req, res) => {
         input_id = parseInt(input_id)
     } catch (error) {
         console.log("Error parsing id")
-        res.sendStatus(400)
+        res.sendStatus(400).send({
+            error: "Error parsing id"
+        });
     }
     const new_hash = await bcrypt.hash(req.body.password, 10);
     const new_first_name = req.body.first_name;
@@ -216,7 +239,9 @@ app.put("/v1/user/:userid", async (req, res) => {
 
     if (req.headers.authorization == null) {
         console.log("------> No credentials passed")
-        res.sendStatus(401).end()
+        res.sendStatus(401).end().send({
+            error: "No credentials passed"
+        });
     } else {
         const auth_header = req.headers.authorization;
         var auth = new Buffer.from(auth_header.split(' ')[1], 'base64').toString().split(':');
@@ -225,7 +250,9 @@ app.put("/v1/user/:userid", async (req, res) => {
 
         if (input_emailaddress == null || input_password == null) {
             console.log("------> Email Address or Password Not Found")
-            res.sendStatus(401).end()
+            res.sendStatus(401).send({
+                error: "Email address or password not found"
+            });
         } else {
             Users.findAll({
                     attributes: ['username', 'id', 'first_name', 'last_name', 'account_created', 'account_updated'],
@@ -256,21 +283,29 @@ app.put("/v1/user/:userid", async (req, res) => {
                                                     }
                                                 })
                                                 .then(r3 => {
-                                                    console.log("Account details of user updated successfully")
-                                                    res.status(204)
+                                                    console.log("Account details updated successfully")
+                                                    res.status(204).send({
+                                                        error: "Account details updated successfully"
+                                                    });
                                                 })
                                         } else {
                                             console.log("------> Account ID Mismatch")
-                                            res.sendStatus(403)
+                                            res.sendStatus(403).send({
+                                                error: "Account id mismatch"
+                                            });
                                         }
                                     } else {
                                         console.log("------> Incorrect Password")
-                                        res.sendStatus(401)
+                                        res.sendStatus(401).send({
+                                            error: "Incorrect password"
+                                        });
                                     }
                                 })
                             })
                     } else {
-                        res.sendStatus(401)
+                        res.sendStatus(401).send({
+                            error: "User not found"
+                        });
                     }
                 })
         }
@@ -491,6 +526,22 @@ app.delete("/v1/product/:productId", async (req, res) => {
             return res.status(403).send({
                 error: "Not authorized to delete this product"
             });
+        }
+
+        // Delete images when product is deleted
+        const images = await Image.findAll({
+            where: {
+                product_id: product.id
+            }
+        });
+        for (let i = 0; i < images.length; i++) {
+            const image = images[i];
+            const deleteObjectCommand = new DeleteObjectCommand({
+                Bucket: process.env.BUCKETNAME,
+                Key: image.s3_bucket_path.substring(image.s3_bucket_path.lastIndexOf('/') + 1)
+            });
+            await s3.send(deleteObjectCommand);
+            await image.destroy();
         }
         await product.destroy();
         return res.status(200).send({
@@ -808,14 +859,13 @@ Products.hasMany(Image, {
     foreignKey: 'product_id'
 });
 
-const s3 = new S3Client({
+// Create Amazon S3 client instance
+const s3 = new S3Client ({
     region: process.env.AWS_REGION,
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-    }
+    credentials: defaultProvider({ region: process.env.AWS_REGION }),
 });
 
+//multer middleware with the multer-s3 storage engine to upload files to an Amazon S3 bucket
 const upload = multer({
     storage: multerS3({
         s3: s3,
