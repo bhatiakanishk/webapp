@@ -114,4 +114,3 @@ Sample to add new product:
 ## Running the test
 
 npm run test
-
