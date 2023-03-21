@@ -13,6 +13,8 @@ const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const mime = require('mime');
 const { defaultProvider } = require("@aws-sdk/credential-provider-node");
 
+let StatsD = require('node-statsd'), client =new StatsD();
+
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
     const randomInt = randomBytes.readUInt32BE();
@@ -39,6 +41,7 @@ sequelize.authenticate().then(() => {
 
 // Healthz
 app.get('/healthz', (req, res) => {
+    client.increment('checkhealthz');
     res.status(200).json('Okay')
 })
 
@@ -86,6 +89,7 @@ app.use(express.json())
 
 //Create User
 app.post("/v1/user", async (req, res) => {
+    client.increment('postuserapi');
     const id = generateRandomInt(1, 1000);
     const username = req.body.username;
     const first_name = req.body.first_name;
@@ -124,7 +128,7 @@ app.post("/v1/user", async (req, res) => {
                             account_updated: user.account_updated
                         }))
                         .catch(err => res.sendStatus(400).json({
-                            error: err.message
+                            error: "User already exists"
                         }))
                 } else {
                     console.log("------> User already exists")
@@ -144,6 +148,7 @@ app.post("/v1/user", async (req, res) => {
 
 // Get User Info
 app.get("/v1/user/:userid", async (req, res) => {
+    client.increment('getuserapi');
     let input_id = req.params.userid;
     try {
         input_id = parseInt(input_id)
@@ -224,6 +229,7 @@ app.get("/v1/user/:userid", async (req, res) => {
 
 // Update User Info
 app.put("/v1/user/:userid", async (req, res) => {
+    client.increment('putuserapi');
     let input_id = req.params.userid;
     try {
         input_id = parseInt(input_id)
@@ -239,7 +245,7 @@ app.put("/v1/user/:userid", async (req, res) => {
 
     if (req.headers.authorization == null) {
         console.log("------> No credentials passed")
-        res.sendStatus(401).end().send({
+        res.sendStatus(401).send({
             error: "No credentials passed"
         });
     } else {
@@ -362,6 +368,7 @@ sequelize.sync().then(() => {
 
 // Create product
 app.post("/v1/product", async (req, res) => {
+    client.increment('postproductapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -471,6 +478,7 @@ app.post("/v1/product", async (req, res) => {
 
 // Delete product
 app.delete("/v1/product/:productId", async (req, res) => {
+    client.increment('deleteproductapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -557,6 +565,7 @@ app.delete("/v1/product/:productId", async (req, res) => {
 
 // Update product with PUT
 app.put("/v1/product/:productId", async (req, res) => {
+    client.increment('putproductapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -681,6 +690,7 @@ app.put("/v1/product/:productId", async (req, res) => {
 
 // Update product with PATCH
 app.patch("/v1/product/:productId", async (req, res) => {
+    client.increment('patchproductapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -790,6 +800,7 @@ app.patch("/v1/product/:productId", async (req, res) => {
 
 // Get product by ID
 app.get("/v1/product/:productId", async (req, res) => {
+    client.increment('getproductapi');
     try {
         const productId = req.params.productId;
         const product = await Products.findOne({
@@ -880,6 +891,7 @@ const upload = multer({
 
 // Post Image
 app.post("/v1/product/:productId/image", upload.single('image'), async (req, res) => {
+    client.increment('postimageapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -996,6 +1008,7 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
 
 // Delete Image
 app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
+    client.increment('deleteimageapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -1090,6 +1103,7 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
 
 // Get all images for a product
 app.get("/v1/product/:productId/image", async (req, res) => {
+    client.increment('getallimageapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
@@ -1167,6 +1181,7 @@ app.get("/v1/product/:productId/image", async (req, res) => {
 
 // Get image details
 app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
+    client.increment('getimageapi');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {

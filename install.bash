@@ -20,6 +20,14 @@ sudo mv /home/ec2-user/index.js /home/ec2-user/webapp/
 sudo mv /home/ec2-user/package.json /home/ec2-user/webapp/
 sudo mv /home/ec2-user/server.d.ts /home/ec2-user/webapp/
 sudo mv /home/ec2-user/server.service /home/ec2-user/webapp/
+sudo mv /home/ec2-user/cloudwatch-config.json /opt/
+
+
+# Install CloudWatch Agent
+sudo yum install -y wget
+wget https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+sudo rpm -U ./amazon-cloudwatch-agent.rpm
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/cloudwatch-config.json -s
 
 # Create .env
 touch /home/ec2-user/webapp/.env
