@@ -5,7 +5,7 @@
     },
     "metrics":
     {
-        "namespace": "MyNameSpace1",
+        "namespace": "MyNameSpace3",
         "metrics_collected":
         {
             "statsd":
