@@ -601,7 +601,7 @@ app.delete("/v1/product/:productId", async (req, res) => {
         }
         await product.destroy();
         logger.info('Product deleted successfully');
-        return res.status(200).send({
+        return res.status(204).send({
             message: "Product deleted successfully"
         });
     } catch (error) {
@@ -1036,9 +1036,10 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
             });
         }
         const file = req.file;
+        const timestamp = Date.now().toString();
         const putObjectCommand = new PutObjectCommand({
             Bucket: process.env.BUCKETNAME,
-            Key: `${user.id}/${req.params.productId}/${file.originalname}.${mime.getExtension(file.mimetype)}`,
+            Key: `${user.id}/${req.params.productId}/${file.originalname}-${timestamp}.${mime.getExtension(file.mimetype)}`,
             Body: file.buffer,
             ContentType: file.mimetype
         });
@@ -1046,7 +1047,7 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
         const image = await Image.create({
             product_id: product.id,
             file_name: file.originalname,
-            s3_bucket_path: `https://${process.env.BUCKETNAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${user.id}/${req.params.productId}/${file.originalname}.${mime.getExtension(file.mimetype)}`,
+            s3_bucket_path: `https://${process.env.BUCKETNAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${user.id}/${req.params.productId}/${file.originalname}-${timestamp}.${mime.getExtension(file.mimetype)}`,
             metadata: {
                 contentType: file.mimetype,
                 size: file.size
@@ -1054,7 +1055,7 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
         });
 
         logger.info('Image uploaded successfully');
-        return res.status(200).send({
+        return res.status(201).send({
             message: "Image uploaded successfully",
             data: {
                 image_id: image.image_id,
@@ -1159,7 +1160,7 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         await image.destroy();
 
         logger.info('Image deleted successfully');
-        return res.status(200).send({
+        return res.status(204).send({
             message: "Image deleted successfully",
         });
 
