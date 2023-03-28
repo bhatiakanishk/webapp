@@ -13,6 +13,33 @@ const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const mime = require('mime');
 const { defaultProvider } = require("@aws-sdk/credential-provider-node");
 
+// StatsD for API count
+
+let StatsD = require('node-statsd'), client =new StatsD();
+
+// Winston Logger
+
+const winston = require('winston');
+const WinstonCloudWatch = require('winston-cloudwatch');
+const { error } = require("console");
+
+// Logger Instance
+
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    defaultMeta: { service: 'my-service' },
+    transports: [
+        new WinstonCloudWatch({
+            level: 'info',
+            logGroupName: 'csye6225',
+            logStreamName: 'webapp',
+            awsRegion: process.env.AWS_REGION,
+            messageFormatter: ({level, message, ...meta}) => `${level}: ${message} ${JSON.stringify(meta)}`,
+        }),
+    ],
+});
+
 function generateRandomInt(min, max) {
     const randomBytes = crypto.randomBytes(4);
     const randomInt = randomBytes.readUInt32BE();
@@ -21,6 +48,7 @@ function generateRandomInt(min, max) {
 }
 
 // Parameters to create user table
+
 const sequelize = new Sequelize({
     database: process.env.DATABASENAME,
     username: process.env.SQLUSER,
@@ -31,18 +59,23 @@ const sequelize = new Sequelize({
 });
 
 // Connection of user table to the database
+
 sequelize.authenticate().then(() => {
-    console.log('User table connected successfully');
+    logger.info('User table connected successfully');
 }).catch((error) => {
-    console.error('Unable to connect to the database: ', error);
+    logger.error('Unable to connect to the database');
 });
 
 // Healthz
+
 app.get('/healthz', (req, res) => {
+    client.increment('checkhealthz');
+    logger.info('Health check endpoint accessed successfully');
     res.status(200).json('Okay')
 })
 
-// Create table "Users" with columns  
+// Create User Table columns
+
 const Users = sequelize.define('Users', {
     id: {
         type: Sequelize.INTEGER,
@@ -75,28 +108,37 @@ const Users = sequelize.define('Users', {
 })
 
 // Check for user table creation
+
 sequelize.sync().then(() => {
-    console.log('Users table created successfully!');
+    logger.info('User table create successfully');
 }).catch((error) => {
-    console.error('Unable to create table : ', error);
+    logger.error('Unable to create user table: ', error);
 });
 
 // Middleware to read incoming requests
+
 app.use(express.json())
 
-//Create User
+//POST User
+
 app.post("/v1/user", async (req, res) => {
+    client.increment('postuserapi');
+    logger.info('Reached POST User API');
     const id = generateRandomInt(1, 1000);
     const username = req.body.username;
     const first_name = req.body.first_name;
     const last_name = req.body.last_name;
     const hashedPassword = bcrypt.hashSync(data = req.body.password, salt = 10);
+
+    logger.info(`New user registered with email: ${username}`);
+
     // Email Validation
+
     let regex = new RegExp('[a-z0-9]+@[a-z]+\.[a-z]{2,3}');
     if (regex.test(username) == false) {
-        console.log("------> Please enter a valid email address")
+        logger.error('Invalid email address');
         res.sendStatus(400).send({
-            error: "Please enter a valid email address"
+            message: "Please enter a valid email address"
         });
     } else {
         Users.findOne({
@@ -124,50 +166,52 @@ app.post("/v1/user", async (req, res) => {
                             account_updated: user.account_updated
                         }))
                         .catch(err => res.sendStatus(400).json({
-                            error: err.message
+                            message: "User already exists"
                         }))
                 } else {
-                    console.log("------> User already exists")
+                    logger.error('User already exists');
                     res.sendStatus(400).send({
-                        error: "User already exists"
+                        message: "User already exists"
                     });
                 }
             })
             .catch(err => {
-                console.log(err)
+                logger.error('Failed to create new user: ',err);
                 res.sendStatus(400).send({
-                    error: "Failed to create new user"
+                    message: "Failed to create new user"
                 });
             })
     }
 });
 
-// Get User Info
+// GET User
+
 app.get("/v1/user/:userid", async (req, res) => {
+    client.increment('getuserapi');
+    logger.info('Reached GET User API');
     let input_id = req.params.userid;
     try {
         input_id = parseInt(input_id)
     } catch (error) {
-        console.log("Error parsing id")
+        logger.error('Error parsing id');
         res.sendStatus(400).send({
-            error: "Error parsing id"
+            message: "Error parsing id"
         });
     }
     if (req.headers.authorization == null) {
-        console.log("------> No credentials passed")
+        logger.error('No credentials passed');
         res.sendStatus(401).send({
-            error: "No credentials passed"
+            message: "No credentials passed"
         });
     } else {
         const auth_header = req.headers.authorization;
         var auth = new Buffer.from(auth_header.split(' ')[1], 'base64').toString().split(':');
-        console.log(auth)
         var input_emailaddress = auth[0];
         var input_password = auth[1];
         if (input_emailaddress == null || input_password == null) {
-            console.log("------> Email Address or Password Not Found")
+            logger.error('Email Address or Password Not Found');
             res.sendStatus(401).send({
-                error: "Email address or password not found"
+                message: "Email address or password not found"
             });
         } else {
             Users.findOne({
@@ -179,10 +223,9 @@ app.get("/v1/user/:userid", async (req, res) => {
                 .then(find_user => {
                     if (find_user != "") {
                         user_password = find_user.password
-                        console.log(input_password, user_password)
                         bcrypt.compare(input_password, user_password, function (err, compare_results) {
                             if (compare_results) {
-                                console.log("------> User Logged in")
+                                logger.info('User logged in');
                                 if (find_user.username == input_emailaddress) {
                                     res.status(201).send({
                                         message: 'User Found',
@@ -194,43 +237,47 @@ app.get("/v1/user/:userid", async (req, res) => {
                                         account_updated: find_user.account_updated
                                     })
                                 } else {
-                                    console.log("------> Account ID Mismatch")
+                                    logger.err('Account ID mismatch');
                                     res.sendStatus(403).send({
-                                        error: "Account id mismatch"
+                                        error: "Account ID mismatch"
                                     });
                                 }
                             } else if (err) {
-                                console.log("------> Incorrect Password", err)
+                                logger.error('Incorrect Password');
                                 res.sendStatus(401).send({
-                                    error: "Incorrect password"
+                                    message: "Incorrect Password"
                                 });
                             }
                         })
                     } else {
+                        logger.error('User not authorized');
                         res.sendStatus(401).send({
-                            error: "User not authorized"
+                            message: "User not authorized"
                         });
                     }
                 })
                 .catch(err => {
-                    console.log(err)
+                    logger.error('User not found');
                     res.sendStatus(400).send({
-                        error: "User not found"
+                        message: "User not found"
                     });
                 })
         }
     }
 });
 
-// Update User Info
+// PUT User
+
 app.put("/v1/user/:userid", async (req, res) => {
+    client.increment('putuserapi');
+    logger.info('Reached PUT User API');
     let input_id = req.params.userid;
     try {
         input_id = parseInt(input_id)
     } catch (error) {
-        console.log("Error parsing id")
+        logger.error('Error parsing ID');
         res.sendStatus(400).send({
-            error: "Error parsing id"
+            message: "Error parsing ID"
         });
     }
     const new_hash = await bcrypt.hash(req.body.password, 10);
@@ -238,9 +285,9 @@ app.put("/v1/user/:userid", async (req, res) => {
     const new_last_name = req.body.last_name;
 
     if (req.headers.authorization == null) {
-        console.log("------> No credentials passed")
-        res.sendStatus(401).end().send({
-            error: "No credentials passed"
+        logger.error('No credentials passed');
+        res.sendStatus(401).send({
+            message: "No credentials passed"
         });
     } else {
         const auth_header = req.headers.authorization;
@@ -249,9 +296,9 @@ app.put("/v1/user/:userid", async (req, res) => {
         var input_password = auth[1];
 
         if (input_emailaddress == null || input_password == null) {
-            console.log("------> Email Address or Password Not Found")
+            logger.error('Email Address or Password Not Found');
             res.sendStatus(401).send({
-                error: "Email address or password not found"
+                message: "Email address or password not found"
             });
         } else {
             Users.findAll({
@@ -271,7 +318,7 @@ app.put("/v1/user/:userid", async (req, res) => {
                             .then(find_password => {
                                 bcrypt.compare(input_password, find_password.password, function (err, compare_results) {
                                     if (compare_results) {
-                                        console.log("------> User Logged in")
+                                        logger.info('User Logged in');
                                         if (find_password.username == input_emailaddress) {
                                             Users.update({
                                                     first_name: new_first_name,
@@ -283,28 +330,29 @@ app.put("/v1/user/:userid", async (req, res) => {
                                                     }
                                                 })
                                                 .then(r3 => {
-                                                    console.log("Account details updated successfully")
+                                                    logger.info('Account details updated successfully');
                                                     res.status(204).send({
-                                                        error: "Account details updated successfully"
+                                                        message: "Account details updated successfully"
                                                     });
                                                 })
                                         } else {
-                                            console.log("------> Account ID Mismatch")
+                                            logger.error('Account ID mismatch');
                                             res.sendStatus(403).send({
-                                                error: "Account id mismatch"
+                                                message: "Account id mismatch"
                                             });
                                         }
                                     } else {
-                                        console.log("------> Incorrect Password")
+                                        logger.error('Incorrect Password')
                                         res.sendStatus(401).send({
-                                            error: "Incorrect password"
+                                            message: "Incorrect password"
                                         });
                                     }
                                 })
                             })
                     } else {
+                        logger.error('User not found');
                         res.sendStatus(401).send({
-                            error: "User not found"
+                            message: "User not found"
                         });
                     }
                 })
@@ -312,7 +360,8 @@ app.put("/v1/user/:userid", async (req, res) => {
     }
 });
 
-// Create table "Products" with columns  
+// Create Product Table columns  
+
 const Products = sequelize.define('Products', {
     id: {
         type: Sequelize.INTEGER,
@@ -354,18 +403,22 @@ const Products = sequelize.define('Products', {
 })
 
 // Check for product table creation
+
 sequelize.sync().then(() => {
-    console.log('Products table created successfully!');
+    logger.info('Products table created successfully!');
 }).catch((error) => {
-    console.error('Unable to create table : ', error);
+    logger.error('Unable to create table : ', error);
 });
 
-// Create product
+// POST Product
+
 app.post("/v1/product", async (req, res) => {
+    client.increment('postproductapi');
+    logger.info('Reached POST Product API')
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
@@ -375,7 +428,7 @@ app.post("/v1/product", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
                 error: "Please enter a valid email and password"
             });
@@ -390,7 +443,7 @@ app.post("/v1/product", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
                 error: "User not found"
             });
@@ -398,13 +451,12 @@ app.post("/v1/product", async (req, res) => {
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
                 error: "Incorrect Password"
             });
         }
-        console.log("------> User Logged in");
-
+        logger.info('User Logged in');
         const id = generateRandomInt(1, 1000);
         const name = req.body.name;
         const description = req.body.description;
@@ -414,21 +466,21 @@ app.post("/v1/product", async (req, res) => {
         const owner_user_id = user.id;
 
         if (!name || !description || !sku || !manufacturer || !quantity) {
-            console.log("------> Missing required fields");
+            logger.error('Please enter all the required fields');
             return res.status(400).send({
                 error: "Please enter all the required fields"
             });
         }
 
         if (typeof name !== "string" || typeof description !== "string" || typeof sku !== "string" || typeof manufacturer !== "string" || typeof quantity !== "number" || typeof owner_user_id !== "number") {
-            console.log("------> Invalid input data types");
+            logger.error('Invalid input data types');
             return res.status(400).send({
                 error: "Invalid input data types"
             });
         }
 
         if (!Number.isInteger(quantity) || quantity <= 0 || quantity >= 100) {
-            console.log("------> Product quantity invalid");
+            logger.error('Invalid product quantity');
             return res.status(400).send({
                 error: "Invalid product quantity"
             });
@@ -442,12 +494,11 @@ app.post("/v1/product", async (req, res) => {
         });
 
         if (existingProduct) {
-            console.log("------> Product SKU already exists");
+            logger.error('Product SKU already exists');
             return res.status(400).send({
                 error: "Product SKU already exists"
             });
         }
-
         const product = await Products.create({
             id: id,
             name: name,
@@ -457,26 +508,31 @@ app.post("/v1/product", async (req, res) => {
             quantity: quantity,
             owner_user_id: owner_user_id,
         });
+        logger.info('Product created');
         return res.status(201).send({
             message: "Product Created",
             product: product
         });
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request', error)
         return res.status(400).send({
+            message: "Error parsing request",
             error: error.message
         });
     }
 });
 
-// Delete product
+// DELETE Product
+
 app.delete("/v1/product/:productId", async (req, res) => {
+    client.increment('deleteproductapi');
+    logger.info('Reached DELETE Product API')
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -484,9 +540,9 @@ app.delete("/v1/product/:productId", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -499,32 +555,32 @@ app.delete("/v1/product/:productId", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
         const id = req.params.productId;
         const product = await Products.findByPk(id);
 
         if (!product) {
-            console.log("------> Product not found");
+            logger.error('Product not found');
             return res.status(404).send({
-                error: "Product not found"
+                message: "Product not found"
             });
         }
         if (user.id != product.owner_user_id) {
-            console.log("------> Not authorized to delete this product");
+            logger.error('Not authorized to delete this product');
             return res.status(403).send({
-                error: "Not authorized to delete this product"
+                message: "Not authorized to delete this product"
             });
         }
 
@@ -544,25 +600,30 @@ app.delete("/v1/product/:productId", async (req, res) => {
             await image.destroy();
         }
         await product.destroy();
+        logger.info('Product deleted successfully');
         return res.status(200).send({
             message: "Product deleted successfully"
         });
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message
         });
     }
 });
 
-// Update product with PUT
+// PUT Product
+
 app.put("/v1/product/:productId", async (req, res) => {
+    client.increment('putproductapi');
+    logger.info('Reached PUT Product API');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -570,9 +631,9 @@ app.put("/v1/product/:productId", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -585,20 +646,20 @@ app.put("/v1/product/:productId", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
-        console.log("------> User Logged in");
+        logger.info('User logged in');
         const productId = req.params.productId;
         const name = req.body.name;
         const description = req.body.description;
@@ -608,23 +669,23 @@ app.put("/v1/product/:productId", async (req, res) => {
         const owner_user_id = user.id;
 
         if (!name || !description || !sku || !manufacturer || name.length === 0 || description.length === 0 || sku.length === 0 || manufacturer.length === 0) {
-            console.log("------> Missing required field");
+            logger.error('Missing required field');
             return res.status(400).send({
-                error: "Missing required field"
+                message: "Missing required field"
             });
         }
 
         if (typeof name !== "string" || typeof description !== "string" || typeof sku !== "string" || typeof manufacturer !== "string" || typeof quantity !== "number" || typeof owner_user_id !== "number") {
-            console.log("------> Invalid input data types");
+            logger.error('Invalid input data types');
             return res.status(400).send({
-                error: "Invalid input data types"
+                message: "Invalid input data types"
             });
         }
 
         if (!Number.isInteger(quantity) || quantity <= 0 || quantity >= 100) {
-            console.log("------> Product quantity invalid");
+            logger.error('Invalid product quantity');
             return res.status(400).send({
-                error: "Invalid product quantity"
+                message: "Invalid product quantity"
             });
         }
 
@@ -636,9 +697,9 @@ app.put("/v1/product/:productId", async (req, res) => {
         });
 
         if (!product) {
-            console.log("------> Unauthorized to update this product");
+            logger.error('Unauthorized to update this product');
             return res.status(403).send({
-                error: "Unauthorized to update this product"
+                message: "Unauthorized to update this product"
             });
         }
 
@@ -650,14 +711,15 @@ app.put("/v1/product/:productId", async (req, res) => {
                     }
                 });
                 if (existingProduct) {
-                    console.log("------> SKU already exists in the database");
+                    logger.error('SKU already exists in the database');
                     return res.status(400).send({
-                        error: "SKU already exists in the database"
+                        message: "SKU already exists in the database"
                     });
                 }
             } catch (error) {
-                console.error(error);
+                logger.error(error);
                 return res.status(400).send({
+                    message: 'Error parsing request',
                     error: error.message
                 });
             }
@@ -670,23 +732,28 @@ app.put("/v1/product/:productId", async (req, res) => {
             manufacturer: manufacturer,
             quantity: quantity,
         });
+        logger.info('Product updated successfully');
         return res.json(updatedProduct);
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message
         });
     }
 })
 
-// Update product with PATCH
+// PATCH Product
+
 app.patch("/v1/product/:productId", async (req, res) => {
+    client.increment('patchproductapi');
+    logger.info('Reached PATCH Product API');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -694,9 +761,9 @@ app.patch("/v1/product/:productId", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(400).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -709,17 +776,17 @@ app.patch("/v1/product/:productId", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
         const productId = req.params.productId;
@@ -732,12 +799,12 @@ app.patch("/v1/product/:productId", async (req, res) => {
         });
 
         if (!product) {
-            console.log("------> Unauthorized to update this product");
+            logger.error('Unauthorized to update this product');
             return res.status(401).send({
-                error: "Unauthorized to update this product"
+                message: "Unauthorized to update this product"
             });
         }
-
+        logger.info('User logged in');
         const name = req.body.name || product.name;
         const description = req.body.description || product.description;
         const sku = req.body.sku || product.sku;
@@ -745,9 +812,9 @@ app.patch("/v1/product/:productId", async (req, res) => {
         const quantity = req.body.quantity || product.quantity;
 
         if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 0)) {
-            console.log("------> Product quantity invalid");
+            logger.error('Invalid product quantity');
             return res.status(400).send({
-                error: "Invalid product quantity"
+                message: "Invalid product quantity"
             });
         }
 
@@ -759,14 +826,15 @@ app.patch("/v1/product/:productId", async (req, res) => {
                     }
                 });
                 if (existingProduct) {
-                    console.log("------> SKU already exists in the database");
+                    logger.error('SKU already exists in the database');
                     return res.status(400).send({
                         error: "SKU already exists in the database"
                     });
                 }
             } catch (error) {
-                console.error(error);
+                logger.error('Error parsing request');
                 return res.status(400).send({
+                    message: 'Error parsing request',
                     error: error.message
                 });
             }
@@ -779,17 +847,22 @@ app.patch("/v1/product/:productId", async (req, res) => {
             manufacturer: manufacturer,
             quantity: quantity,
         });
+        logger.info('Product updated successfully');
         return res.json(updatedProduct);
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message
         });
     }
 });
 
-// Get product by ID
+// GET product
+
 app.get("/v1/product/:productId", async (req, res) => {
+    client.increment('getproductapi');
+    logger.info('Reached GET Product API');
     try {
         const productId = req.params.productId;
         const product = await Products.findOne({
@@ -800,11 +873,12 @@ app.get("/v1/product/:productId", async (req, res) => {
         });
 
         if (!product) {
-            console.log("------> Product not found");
+            logger.error('Product not found');
             return res.status(404).send({
-                error: "Product not found"
+                message: "Product not found"
             });
         }
+        logger.info('Product found successfully');
         return res.status(200).json({
             id: product.id,
             name: product.name,
@@ -817,14 +891,16 @@ app.get("/v1/product/:productId", async (req, res) => {
             owner_user_id: product.owner_user_id
         });
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message
         });
     }
 });
 
-// Create table "Image" with columns
+// Create Image Table columns
+
 const Image = sequelize.define('Image', {
     image_id: {
         type: Sequelize.INTEGER,
@@ -878,14 +954,17 @@ const upload = multer({
     })
 });
 
-// Post Image
+// POST Image
+
 app.post("/v1/product/:productId/image", upload.single('image'), async (req, res) => {
+    client.increment('postimageapi');
+    logger.info('Reached POST Image API');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -893,9 +972,9 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -908,52 +987,52 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
         const id = req.params.productId;
         const product = await Products.findByPk(id);
 
         if (!product) {
-            console.log("------> Product not found");
+            logger.error('Product not found');
             return res.status(404).send({
-                error: "Product not found"
+                message: "Product not found"
             });
         }
         if (!req.params.productId) {
-            console.log("------> Product ID is required");
+            logger.error('Product ID is required');
             return res.status(400).send({
-                error: "Product ID is required"
+                message: "Product ID is required"
             });
         }
         if (user.id != product.owner_user_id) {
-            console.log("------> Not authorized to upload image for this product");
+            logger.error('Not authorized to upload image for this product');
             return res.status(403).send({
-                error: "Not authorized to upload image for this product"
+                message: "Not authorized to upload image for this product"
             });
         }
         
         if (!req.file) {
-            console.log("------> File is required");
+            logger.error('File is required');
             return res.status(400).send({
-                error: "File is required"
+                message: "File is required"
             });
         }
 
         if (!req.file.mimetype) {
-            console.log("------> File type is required");
+            logger.error('File type is required');
             return res.status(400).send({
-                error: "File type is required"
+                message: "File type is required"
             });
         }
         const file = req.file;
@@ -974,7 +1053,7 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
             }
         });
 
-        console.log("------> Image uploaded successfully");
+        logger.info('Image uploaded successfully');
         return res.status(200).send({
             message: "Image uploaded successfully",
             data: {
@@ -987,21 +1066,25 @@ app.post("/v1/product/:productId/image", upload.single('image'), async (req, res
         });
 
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message,
         });
     }
 });
 
-// Delete Image
+// DELETE Image
+
 app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
+    client.increment('deleteimageapi');
+    logger.info('Reached DELETE Image API')
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -1009,9 +1092,9 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -1024,17 +1107,17 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
 
@@ -1042,16 +1125,16 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         const product = await Products.findByPk(productId);
 
         if (!product) {
-            console.log("------> Product not found");
+            logger.error('Product not found');
             return res.status(404).send({
-                error: "Product not found"
+                message: "Product not found"
             });
         }
 
         if (user.id !== product.owner_user_id) {
-            console.log("------> Not authorized to delete image for this product");
+            logger.error('Not authorized to delete image for this product');
             return res.status(403).send({
-                error: "Not authorized to delete image for this product"
+                message: "Not authorized to delete image for this product"
             });
         }
 
@@ -1059,9 +1142,9 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         const image = await Image.findByPk(imageId);
 
         if (!image) {
-            console.log("------> Image not found");
+            logger.error('Image not found');
             return res.status(404).send({
-                error: "Image not found"
+                message: "Image not found"
             });
         }
 
@@ -1075,27 +1158,31 @@ app.delete("/v1/product/:productId/image/:image_id", async (req, res) => {
         // delete image from database
         await image.destroy();
 
-        console.log("------> Image deleted successfully");
+        logger.info('Image deleted successfully');
         return res.status(200).send({
             message: "Image deleted successfully",
         });
 
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message,
         });
     }
 });
 
-// Get all images for a product
+// GET Image for a Product
+
 app.get("/v1/product/:productId/image", async (req, res) => {
+    client.increment('getallimageapi');
+    logger.info('Reached GET Image for a product API');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -1103,9 +1190,9 @@ app.get("/v1/product/:productId/image", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -1118,26 +1205,26 @@ app.get("/v1/product/:productId/image", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
         const id = req.params.productId;
         const product = await Products.findByPk(id);
 
         if (!product) {
-            console.log("------> Product not found");
+            logger.error('Product not found');
             return res.status(404).send({
-                error: "Product not found"
+                message: "Product not found"
             });
         }
 
@@ -1151,28 +1238,32 @@ app.get("/v1/product/:productId/image", async (req, res) => {
             ]
         });
 
-        console.log("------> Retrieved all images successfully");
+        logger.info('Retrieved all images successfully');
         return res.status(200).send({
             message: "Retrieved all images successfully",
             data: images
         });
 
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message,
         });
     }
 });
 
-// Get image details
+// GET Image
+
 app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
+    client.increment('getimageapi');
+    logger.info('Reached GET Image for a product API');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -1180,9 +1271,9 @@ app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
         const inputEmailAddress = auth[0];
         const password = auth[1];
         if (!inputEmailAddress || !password) {
-            console.log("------> Please enter a valid email and password");
+            logger.error('Please enter a valid email and password');
             return res.status(401).send({
-                error: "Please enter a valid email and password"
+                message: "Please enter a valid email and password"
             });
         }
 
@@ -1195,17 +1286,17 @@ app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
         });
 
         if (!user) {
-            console.log("------> User not found");
+            logger.error('User not found');
             return res.status(404).send({
-                error: "User not found"
+                message: "User not found"
             });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            console.log("------> Incorrect Password");
+            logger.error('Incorrect Password');
             return res.status(401).send({
-                error: "Incorrect Password"
+                message: "Incorrect Password"
             });
         }
 
@@ -1223,20 +1314,20 @@ app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
         });
 
         if (!image) {
-            console.log("------> Image not found");
+            logger.error('Image not found');
             return res.status(404).send({
-                error: "Image not found"
+                message: "Image not found"
             });
         }
-
-        console.log("------> Image details retrieved successfully");
+        logger.info('Image details retrieved successfully');
         return res.status(200).send({
             data: image.toJSON()
         });
 
     } catch (error) {
-        console.error(error);
+        logger.error('Error parsing request');
         return res.status(400).send({
+            message: 'Error parsing request',
             error: error.message,
         });
     }
@@ -1244,6 +1335,6 @@ app.get("/v1/product/:productId/image/:image_id", async (req, res) => {
 
 // Set port number to 8080
 const port = "8080"
-app.listen(port, () => console.log(`Server Started on port ${port}...`))
+app.listen(port, () => logger.info(`Server Started on port ${port}...`))
 
 module.exports = app;

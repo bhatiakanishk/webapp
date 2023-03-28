@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@aws-sdk/abort-controller": "^3.272.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.297.0",
     "@aws-sdk/client-s3": "^3.282.0",
     "@aws-sdk/credential-provider-node": "^3.292.0",
     "assert": "^2.0.0",
@@ -20,7 +21,9 @@
     "node-statsd": "^0.1.1",
     "sequelize": "^6.29.0",
     "supertest": "^6.3.3",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "winston": "^3.8.2",
+    "winston-cloudwatch": "^6.1.1"
   },
   "scripts": {
     "start": "npm install && node index.js",

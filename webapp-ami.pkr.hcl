@@ -12,11 +12,6 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
-variable "source_ami" {
-  type    = string
-  default = "ami-0dfcb1ef8550277af"
-}
-
 variable "ssh_username" {
   type    = string
   default = "ec2-user"
@@ -76,6 +71,11 @@ build {
     source      = "server.service"
     destination = "/home/ec2-user/"
   }
+  provisioner "file" {
+    source      = "cloudwatch-config.json"
+    destination = "/home/ec2-user/"
+  }
+
 
   provisioner "shell" {
     environment_vars = [
