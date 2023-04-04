@@ -68,7 +68,7 @@ sequelize.authenticate().then(() => {
 
 // Healthz
 
-app.get('/healthz', (req, res) => {
+app.get('/healthcheck', (req, res) => {
     client.increment('checkhealthz');
     logger.info('Health check endpoint accessed successfully');
     res.status(200).json('Okay')
