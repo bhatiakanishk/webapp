@@ -71,7 +71,7 @@ sequelize.authenticate().then(() => {
 app.get('/healthcheck', (req, res) => {
     client.increment('checkhealthz');
     logger.info('Health check endpoint accessed successfully');
-    res.status(200).json('Okay')
+    res.status(200).json('OK')
 })
 
 // Create User Table columns
