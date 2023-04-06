@@ -56,19 +56,6 @@ In the git directory, run the following command to install the dependencies and 
 npm start
 ```
 
-## Variable file
-
-Create a variable.tfvars file and the following code to it:
-
-```
-aws_region = "us-east-1"
-source_ami = "ami-0123456789"
-ssh_username = "ec2-user"
-subnet_id = "subnet-0123456789"
-ami_user = "123456789012"
-vpc_id = "vpc-0123456789"
-```
-
 ## Building the AMI with Packer
 
 Build the AMI by running the following code:
