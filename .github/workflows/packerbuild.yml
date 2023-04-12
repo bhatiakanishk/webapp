@@ -40,7 +40,26 @@ jobs:
         env:
           PACKET_LOG: 1 
 
-      - name: Store AMI ID
+      - name: Get Launch Template ID
+        id: get_launch_template_id
         run: |
-          AMI_ID=$(jq -r '.builds[0].artifact_id|split(":")[1]' ./manifest.json)
-          echo "AMI ID: $AMI_ID"
+          launch_template_name="my-launch-template"
+          launch_template_id=$(aws ec2 describe-launch-templates --region ${{ secrets.AWS_REGION }} --query "LaunchTemplates[?LaunchTemplateName=='${launch_template_name}'].LaunchTemplateId" --output text)
+          echo "Launch Template ID: $launch_template_id"
+          echo "##[set-output name=launch_template_id;]$launch_template_id"
+
+      - name: Get Autoscaling Group ID
+        id: get_asg_id
+        run: |
+          asg_name="my-asg"
+          asg_id=$(aws autoscaling describe-auto-scaling-groups --region ${{ secrets.AWS_REGION }} --query "AutoScalingGroups[?AutoScalingGroupName=='${asg_name}'].AutoScalingGroupARN" --output text | awk -F '/' '{print $NF}')
+          echo "Autoscaling Group ID: $asg_id"
+          echo "##[set-output name=asg_id;]$asg_id"
+
+      - name: Get AMI ID
+        id: get_ami_id
+        run: |
+          ami_name="amazon-linux-2-*"
+          ami_id=$(aws ec2 describe-images --region ${{ secrets.AWS_REGION }} --filters "Name=name,Values=${ami_name}" --query 'Images[*].{ID:ImageId,Name:Name}' --output json | jq -r '.[] | select(.Name | contains("'"${ami_name}"'")) | .ID')
+          echo "AMI ID: $ami_id"
+          echo "##[set-output name=ami_id;]$ami_id"
