@@ -75,8 +75,6 @@ build {
     source      = "cloudwatch-config.json"
     destination = "/home/ec2-user/"
   }
-
-
   provisioner "shell" {
     environment_vars = [
       "DEBIAN_FRONTEND=noninteractive",
@@ -84,5 +82,9 @@ build {
     ]
     script = "install.bash"
   }
+  post-processors {
+    type = "manifest"
+    exclude = ["*"]
+    include = ["ami_id"]
+  }
 }
-

@@ -38,4 +38,8 @@ jobs:
           target: webapp-ami.pkr.hcl
 
         env:
-          PACKET_LOG: 1
+          PACKET_LOG: 1 
+
+      - name: Store AMI ID
+        run: |
+          echo "${{ steps.packer.outputs.webapp-ami.ami_id }}" > ami_id.txt
