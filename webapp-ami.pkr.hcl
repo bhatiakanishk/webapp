@@ -82,9 +82,8 @@ build {
     ]
     script = "install.bash"
   }
-  post-processors {
-    type = "manifest"
-    exclude = ["*"]
-    include = ["ami_id"]
+  post-processor "manifest" {
+    output      = "manifest.json"
+    strip_path  = true
   }
 }
