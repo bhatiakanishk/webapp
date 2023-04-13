@@ -68,7 +68,7 @@ jobs:
           echo "$launch_template_id $AMI_ID"
           aws ec2 create-launch-template-version \
             --launch-template-id ${{steps.get_launch_template_id.outputs.launch_template_id}} \
-            --launch-template-data "ImageId=${{steps.get_ami_id.outputs.ami_id}}" \
+            --launch-template-data "ImageId=${{steps.get_ami_id.outputs.ami_id}},InstanceType=t2.micro" \
 
       - name: Start Instance Refresh
         run: |
