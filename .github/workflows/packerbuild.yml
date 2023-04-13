@@ -2,6 +2,7 @@ name: build-ami
 
 env:
   AWS_REGION: us-east-1
+  IMAGE_ID: ${{ steps.build_ami_outputs.ami_id }}
 
 on:
   push:
@@ -55,11 +56,3 @@ jobs:
           asg_id=$(aws autoscaling describe-auto-scaling-groups --region ${{ secrets.AWS_REGION }} --query "AutoScalingGroups[?AutoScalingGroupName=='${asg_name}'].AutoScalingGroupARN" --output text | awk -F '/' '{print $NF}')
           echo "Autoscaling Group ID: $asg_id"
           echo "##[set-output name=asg_id;]$asg_id"
-
-      - name: Get AMI ID
-        id: get_ami_id
-        run: |
-          ami_name="amazon-linux-2-*"
-          ami_id=$(aws ec2 describe-images --region ${{ secrets.AWS_REGION }} --filters "Name=name,Values=${ami_name}" --query 'Images[*].{ID:ImageId,Name:Name}' --output json | jq -r '.[] | select(.Name | contains("'"${ami_name}"'")) | .ID')
-          echo "AMI ID: $ami_id"
-          echo "##[set-output name=ami_id;]$ami_id"
