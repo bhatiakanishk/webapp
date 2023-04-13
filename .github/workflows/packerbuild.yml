@@ -63,13 +63,23 @@ jobs:
           echo "##[set-output name=ami_id;]$ami_id"
           echo "AMI ID: $ami_id"
 
-      - name: Create Launch Template Version
+      - name: Describe Launch Template Versions
+        id: describe_launch_template_versions
         run: |
-          launch_template_id="${{ steps.get_launch_template_id.outputs.launch_template_id }}"
-          ami_id="${{ steps.get_ami_id.outputs.ami_id }}"
-          launch_template_data="$(aws ec2 describe-launch-template-versions --region ${{ secrets.AWS_REGION }} --launch-template-id "$launch_template_id" --query 'LaunchTemplateVersions[0].LaunchTemplateData')"
-          launch_template_data=$(echo "$launch_template_data" | jq '.ImageId = "'"$ami_id"'"')
-          aws ec2 create-launch-template-version --region ${{ secrets.AWS_REGION }} --launch-template-id "$launch_template_id" --source-version "$launch_template_data"
+          launch_template_id=${{steps.get_launch_template_id.outputs.launch_template_id}}
+          aws ec2 describe-launch-template-versions --launch-template-id $launch_template_id --output json > launch_template_versions.json
+          echo "##[set-output name=launch_template_versions;]$(cat launch_template_versions.json)"
+
+      - name: Create Launch Template Version
+        id: create_launch_template_version
+        run: |
+          launch_template_id=${{steps.get_launch_template_id.outputs.launch_template_id}}
+          ami_id=${{steps.get_ami_id.outputs.ami_id}}
+          latest_version=$(jq '.LaunchTemplateVersions[0].VersionNumber' launch_template_versions.json)
+          aws ec2 create-launch-template-version \
+            --launch-template-id $launch_template_id \
+            --launch-template-data "$(jq --arg ami "$ami_id" '.LaunchTemplateVersions[0].LaunchTemplateData.ImageId=$ami' launch_template_versions.json)" \
+            --source-version $latest_version
 
       - name: Start Instance Refresh
         run: |
