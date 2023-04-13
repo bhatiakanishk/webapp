@@ -2,7 +2,7 @@ name: build-ami
 
 env:
   AWS_REGION: us-east-1
-  IMAGE_ID: ${{ steps.build_ami_outputs.ami_id }}
+  IMAGE_ID: ${{ steps.build_ami.outputs.ami_id }}
 
 on:
   push:
