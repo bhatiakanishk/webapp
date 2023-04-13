@@ -38,53 +38,42 @@ jobs:
           target: webapp-ami.pkr.hcl
 
         env:
-          PACKET_LOG: 1 
+          PACKET_LOG: 1
 
-      - name: Get Launch Template ID
-        id: get_launch_template_id
-        run: |
-          launch_template_name="my-launch-template"
-          launch_template_id=$(aws ec2 describe-launch-templates --region ${{ secrets.AWS_REGION }} --query "LaunchTemplates[?LaunchTemplateName=='${launch_template_name}'].LaunchTemplateId" --output text)
-          echo "Launch Template ID: $launch_template_id"
-          echo "##[set-output name=launch_template_id;]$launch_template_id"
+  update_launch_template:
+    name: Update launch template
+    runs-on: ubuntu-latest
+    needs: packer-build
 
-      - name: Get Autoscaling Group ID
-        id: get_asg_id
-        run: |
-          asg_name="my-asg"
-          asg_id=$(aws autoscaling describe-auto-scaling-groups --region ${{ secrets.AWS_REGION }} --query "AutoScalingGroups[?AutoScalingGroupName=='${asg_name}'].AutoScalingGroupARN" --output text | awk -F '/' '{print $NF}')
-          echo "Autoscaling Group ID: $asg_id"
-          echo "##[set-output name=asg_id;]$asg_id"
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_DEMO_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEMO_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-      - name: Get AMI ID
-        id: get_ami_id
-        run: |
-          ami_id=$(jq -r '.builds[0].artifact_id|split(":")[1]' ./manifest.json)
-          echo "##[set-output name=ami_id;]$ami_id"
-          echo "AMI ID: $ami_id"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-      - name: Describe Launch Template Versions
-        id: describe_launch_template_versions
+      - name: Install AWS CLI
         run: |
-          launch_template_id=${{steps.get_launch_template_id.outputs.launch_template_id}}
-          aws ec2 describe-launch-template-versions --launch-template-id $launch_template_id --output json > launch_template_versions.json
-          echo "##[set-output name=launch_template_versions;]$(cat launch_template_versions.json)"
+          sudo apt-get update && sudo apt-get install -y awscli
 
-      - name: Create Launch Template Version
-        id: create_launch_template_version
+      - name: Get latest AMI ID
+        id: vars
         run: |
-          launch_template_id=${{steps.get_launch_template_id.outputs.launch_template_id}}
-          ami_id=${{steps.get_ami_id.outputs.ami_id}}
-          latest_version=$(jq '.LaunchTemplateVersions[0].VersionNumber' launch_template_versions.json)
-          aws ec2 create-launch-template-version \
-            --launch-template-id $launch_template_id \
-            --launch-template-data "$(jq --arg ami "$ami_id" '.LaunchTemplateData.ImageId=$ami' launch_template_versions.json)" \
-            --source-version $latest_version
+          latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+          echo "Latest AMI ID: $latest_ami"
 
-      - name: Start Instance Refresh
+          version_number=$(aws ec2 describe-launch-template-versions --launch-template-name asg_launch_config --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
+          echo "Latest AMI version: $version_number"
+
+          echo "latest_ami=$latest_ami" >> $GITHUB_ENV
+          echo "version_number=$version_number" >> $GITHUB_ENV
+
+      - name: Create new Launch Template version
         run: |
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "my-asg" \
-            --strategy Rolling \
-            --preferences "MinHealthyPercentage=75" \
-            --region ${{ secrets.AWS_REGION }}
+          aws ec2 create-launch-template-version --launch-template-name asg_launch_config --launch-template-data "ImageId=${{ steps.vars.outputs.latest_ami }}" --source-version ${{ steps.vars.outputs.version_number }}
+
+      - name: Autoscaling group instance refresh
+        run: |
+          aws autoscaling start-instance-refresh --auto-scaling-group-name my-asg --strategy Rolling --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
