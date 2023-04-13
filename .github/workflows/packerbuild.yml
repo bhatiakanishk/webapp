@@ -59,6 +59,5 @@ jobs:
       - name: Get AMI ID
         id: get_ami_id
         run: |
-          ami_id=$(grep -oE 'ami-[a-z0-9]{8}' ${{ steps.build_ami.outputs.logs }})
-          echo "AMI ID: $ami_id"
-          echo "##set-output name=ami_id::$ami_id"
+          AMI_ID=$(jq -r '.builds[0].artifact_id|split(":")[1]' ./manifest.json)
+          echo "AMI ID: $AMI_ID"
