@@ -67,7 +67,7 @@ jobs:
           aws ec2 create-launch-template-version \
             --launch-template-id ${{ steps.get_launch_template_id.outputs.launch_template_id }} \
             --source-version  ${{ steps.get_launch_template_id.outputs.launch_template_id }} \
-            --image-id ${{ steps.get_ami_id.outputs.AMI_ID }} \
+            --launch-template-data ImageId=${{ steps.get_ami_id.outputs.AMI_ID }} \
             --region ${{ secrets.AWS_REGION }}
 
       - name: Start Instance Refresh
