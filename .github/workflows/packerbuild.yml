@@ -59,7 +59,7 @@ jobs:
         latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
         echo "Latest AMI ID: $latest_ami"
 
-        version_number=$(aws ec2 describe-launch-template-versions --launch-template-name asg_launch_config --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
+        version_number=$(aws ec2 describe-launch-template-versions --launch-template-name my-launch-template --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
         echo "Latest AMI version: $version_number"
 
         echo "latest_ami=$latest_ami" >> $GITHUB_OUTPUT
