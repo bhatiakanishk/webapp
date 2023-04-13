@@ -121,7 +121,7 @@ app.use(express.json())
 
 //POST User
 
-app.post("/v1/user", async (req, res) => {
+app.post("/v2/user", async (req, res) => {
     client.increment('postuserapi');
     logger.info('Reached POST User API');
     const id = generateRandomInt(1, 1000);
