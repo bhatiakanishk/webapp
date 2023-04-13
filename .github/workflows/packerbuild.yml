@@ -59,15 +59,16 @@ jobs:
       - name: Get AMI ID
         id: get_ami_id
         run: |
-          AMI_ID=$(jq -r '.builds[0].artifact_id|split(":")[1]' ./manifest.json)
-          echo "AMI ID: $AMI_ID"
+          ami_id=$(jq -r '.builds[0].artifact_id|split(":")[1]' ./manifest.json)
+          echo "##[set-output name=ami_id;]$ami_id"
+          echo "AMI ID: $ami_id"
 
       - name: Create Launch Template Version
         run: |
           echo "$launch_template_id $AMI_ID"
           aws ec2 create-launch-template-version \
-            --launch-template-id "$launch_template_id" \
-            --launch-template-data ImageId="$AMI_ID" \
+            --launch-template-id $${{steps.get_launch_template_id.outputs.launch_template_id}} \
+            --launch-template-data "ImageId=${{steps.get_ami_id.outputs.ami_id}}" \
 
       - name: Start Instance Refresh
         run: |
