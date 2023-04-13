@@ -103,3 +103,5 @@ Sample to add new product:
 npm run test
 
 demo line
+
+// Add SG id to yaml template
