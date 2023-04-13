@@ -65,6 +65,7 @@ jobs:
       - name: Create Launch Template Version
         run: |
           aws ec2 create-launch-template-version \
+            --launch-template-name $(launch_template_id) \
             --launch-template-data ImageId=$(AMI_ID) \
 
       - name: Start Instance Refresh
