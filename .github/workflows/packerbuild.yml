@@ -61,4 +61,4 @@ jobs:
         run: |
           ami_id=$(grep -oE 'ami-[a-z0-9]{8}' ${{ steps.build_ami.outputs.logs }})
           echo "AMI ID: $ami_id"
-          echo "::set-output name=ami_id::$ami_id"
+          echo "##set-output name=ami_id::$ami_id"
