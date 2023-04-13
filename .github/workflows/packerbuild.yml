@@ -65,22 +65,11 @@ jobs:
 
       - name: Create Launch Template Version
         run: |
-          current_launch_template=$(aws ec2 describe-launch-templates --region ${{ secrets.AWS_REGION }} --launch-template-names "my-launch-template" --query 'LaunchTemplates[0]')
-          updated_launch_template=$(jq -n --argjson current "$current_launch_template" --arg ami "${{ steps.get_ami_id.outputs.ami_id }}" \
-          '{ 
-            ImageId: $ami,
-            InstanceType: $current.InstanceType,
-            KeyName: $current.KeyName,
-            BlockDeviceMappings: $current.BlockDeviceMappings,
-            IamInstanceProfile: $current.IamInstanceProfile,
-            NetworkInterfaces: $current.NetworkInterfaces,
-            UserData: $current.UserData,
-            LaunchTemplateId: $current.LaunchTemplateId,
-            LaunchTemplateName: $current.LaunchTemplateName,
-            VersionDescription: "Updated with latest AMI"
-          }')
-          new_template_version=$(aws ec2 create-launch-template-version --launch-template-data "$updated_launch_template" --region ${{ secrets.AWS_REGION }} --query "LaunchTemplateVersion.VersionNumber")
-          echo "New launch template version created: $new_template_version"
+          launch_template_id="${{ steps.get_launch_template_id.outputs.launch_template_id }}"
+          ami_id="${{ steps.get_ami_id.outputs.ami_id }}"
+          launch_template_data="$(aws ec2 describe-launch-template-versions --region ${{ secrets.AWS_REGION }} --launch-template-id "$launch_template_id" --query 'LaunchTemplateVersions[0].LaunchTemplateData')"
+          launch_template_data=$(echo "$launch_template_data" | jq '.ImageId = "'"$ami_id"'"')
+          aws ec2 create-launch-template-version --region ${{ secrets.AWS_REGION }} --launch-template-id "$launch_template_id" --source-version "$launch_template_data"
 
       - name: Start Instance Refresh
         run: |
