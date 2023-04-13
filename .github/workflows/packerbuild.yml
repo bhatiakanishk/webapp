@@ -78,7 +78,7 @@ jobs:
           latest_version=$(jq '.LaunchTemplateVersions[0].VersionNumber' launch_template_versions.json)
           aws ec2 create-launch-template-version \
             --launch-template-id $launch_template_id \
-            --launch-template-data "$(jq --arg ami "$ami_id" '.LaunchTemplateVersions[0].LaunchTemplateData.ImageId=$ami' launch_template_versions.json)" \
+            --launch-template-data "$(jq --arg ami "$ami_id" '.LaunchTemplateData.ImageId=$ami' launch_template_versions.json)" \
             --source-version $latest_version
 
       - name: Start Instance Refresh
