@@ -65,8 +65,8 @@ jobs:
       - name: Create Launch Template Version
         run: |
           aws ec2 create-launch-template-version \
-            --launch-template-name ${{launch_template_id}} \
-            --launch-template-data ImageId=${{AMI_ID}} \
+            --launch-template-id $launch_template_id \
+            --launch-template-data ImageId=$AMI_ID \
 
       - name: Start Instance Refresh
         run: |
@@ -74,4 +74,4 @@ jobs:
             --auto-scaling-group-name "my-asg" \
             --strategy Rolling \
             --preferences "MinHealthyPercentage=75" \
-            --region ${{ secrets.AWS_REGION }}    
+            --region ${{ secrets.AWS_REGION }}
