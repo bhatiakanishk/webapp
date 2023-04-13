@@ -61,3 +61,19 @@ jobs:
         run: |
           AMI_ID=$(jq -r '.builds[0].artifact_id|split(":")[1]' ./manifest.json)
           echo "AMI ID: $AMI_ID"
+
+      - name: Create Launch Template Version
+        run: |
+          aws ec2 create-launch-template-version \
+            --launch-template-id ${{ steps.get_launch_template_id.outputs.launch_template_id }} \
+            --source-version  ${{ steps.get_launch_template_id.outputs.launch_template_id }} \
+            --image-id ${{ steps.get_ami_id.outputs.AMI_ID }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Start Instance Refresh
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name "my-asg" \
+            --strategy Rolling \
+            --preferences "MinHealthyPercentage=75" \
+            --region ${{ secrets.AWS_REGION }}    
